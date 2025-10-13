@@ -16,6 +16,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _formKey = GlobalKey<FormState>();
 
   final _nameController = TextEditingController();
+  //It’s a small helper object that Flutter uses to control and read what’s inside a TextField.
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -26,7 +27,7 @@ class _RegisterScreenState extends State<RegisterScreen>
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
 
-  late AnimationController _animationController;
+  late AnimationController _animationController;//“I promise I will assign this variable later before using it.”
   late Animation<double> _fadeAnimation;
 
   @override
@@ -68,13 +69,14 @@ class _RegisterScreenState extends State<RegisterScreen>
             stops: const [0.0, 0.4],
           ),
         ),
-        child: SafeArea(
+        child: SafeArea(//This makes sure everything inside is not covered by the phone’s top area (the clock, battery icon) or the bottom bar.
           child: FadeTransition(
-            opacity: _fadeAnimation,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
+            opacity: _fadeAnimation,//This makes everything inside it appear smoothly (fade in) instead of suddenly popping up.
+            child: SingleChildScrollView(//“Allow scrolling if the page is too long.”
+              padding: const EdgeInsets.all(24.0),//Here it adds 24 pixels of empty space on all sides of the scroll area.
+
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.stretch,//means “make everything take the full width of the screen.”
                 children: [
                   const SizedBox(height: 20),
                   _buildHeader(),
@@ -125,13 +127,14 @@ class _RegisterScreenState extends State<RegisterScreen>
   Widget _buildFormCard() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.white,// white background
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
+        // rounded corners
+        boxShadow: [//// shadow below the box
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            blurRadius: 20, // how soft the shadow is
+            offset: const Offset(0, 10), // shadow goes down a bit
           ),
         ],
       ),
@@ -184,7 +187,7 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   Widget _buildPhoneField() {
     return TextFormField(
-      controller: _phoneController,
+      controller: _phoneController,//a small helper object that stores what the user types)
       keyboardType: TextInputType.phone,
       decoration: const InputDecoration(
         labelText: 'Phone Number',
@@ -271,7 +274,9 @@ class _RegisterScreenState extends State<RegisterScreen>
       width: double.infinity,
       height: 50,
       child: ElevatedButton(
-        onPressed: _isLoading
+        onPressed: _isLoading//If _isLoading is true → disable the button (it won’t respond)
+
+         //If _isLoading is false → run the code inside { ... } (call the register function)
             ? null
             : () {
           _controller.handleRegister(

@@ -32,6 +32,45 @@ class VerifySMSController {
   final TextEditingController newPasswordController = TextEditingController();
   final TextEditingController confirmPasswordController = TextEditingController();
 
+
+  Future<void> sendVerificationSMS1() async {
+    // 🔥 COMMENT OUT THE CONFIG CHECK
+    // if (!SMSService.isConfigured()) {
+    //   showMessage('SMS service not configured. Please add your Brevo API key.', isError: true);
+    //   return;
+    // }
+
+    setState(() => isLoading = true);
+
+    try {
+      generatedCode = "123123";
+
+      // 🔥 COMMENT OUT THE ACTUAL SMS SENDING
+      // bool success = await SMSService.sendVerificationSMS(
+      //   phoneNumber: phoneNumber,
+      //   verificationCode: generatedCode!,
+      // );
+
+      // 🔥 ADD THIS - Fake success
+      bool success = true;
+
+      setState(() {
+        smsSent = success;
+        isLoading = false;
+      });
+
+      if (success) {
+        // 🔥 CHANGE THIS MESSAGE TO SHOW THE CODE
+        showMessage('TEST MODE: Your code is $generatedCode');
+        startResendCountdown();
+      } else {
+        showMessage('Failed to send SMS. Please try again.', isError: true);
+      }
+    } catch (e) {
+      setState(() => isLoading = false);
+      showMessage('Error sending SMS: $e', isError: true);
+    }
+  }
   Future<void> sendVerificationSMS() async {
     if (!SMSService.isConfigured()) {
       showMessage('SMS service not configured. Please add your Brevo API key.', isError: true);
@@ -74,7 +113,31 @@ class VerifySMSController {
       return resendCountdown > 0;
     });
   }
+  Future<void> verifyCode1(List<TextEditingController> codeControllers, List<FocusNode> focusNodes) async {
+    final enteredCode = codeControllers.map((c) => c.text).join();
 
+    if (enteredCode.length != 6) {
+      showMessage('Please enter the complete 6-digit code', isError: true);
+      return;
+    }
+
+    // 🔥 ADD THIS FOR TESTING
+    if (enteredCode == "123456" || enteredCode == generatedCode) {
+      setState(() {
+        isVerified = true;
+        showPasswordSection = true;
+      });
+      showMessage('Code verified! Please enter your new password.');
+      return;
+    }
+
+    // Original validation continues...
+    showMessage('Invalid verification code. Please try again.', isError: true);
+    for (var controller in codeControllers) {
+      controller.clear();
+    }
+    focusNodes[0].requestFocus();
+  }
   Future<void> verifyCode(List<TextEditingController> codeControllers, List<FocusNode> focusNodes) async {
     final enteredCode = codeControllers.map((c) => c.text).join();
 

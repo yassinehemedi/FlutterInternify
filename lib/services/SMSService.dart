@@ -1,25 +1,24 @@
-// ==================== SMS SERVICE ====================
 // File: services/sms_service.dart
 
 import 'dart:math';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 /// SMS Service using Infobip API
 class SMSService {
-  // Infobip API configuration
-  static const String _apiKey = 'c5c984d58926ebf869d87652577cb968-ec87a5ab-ab79-44f5-b0e9-aed045d5c2cb';
-  static const String _baseUrl = 'https://pevvme.api.infobip.com';
-  // e.g., 'https://YOUR_ENVIRONMENT.api.infobip.com'
+  // ================== CONFIG ==================
+  static const String _apiKey = 'b064d4c01a77941f4d3c498379d755c6-31b00cf9-11fa-4710-90c7-f4abbb5282a0';
+  static const String _baseUrl = 'https://jjl8rv.api.infobip.com';
+  // Example: 'https://pevvme.api.infobip.com'
 
-  /// Generate 6-digit verification code
+  // ================== GENERATE VERIFICATION CODE ==================
   static String generateVerificationCode() {
     final random = Random.secure();
     final code = random.nextInt(900000) + 100000; // 100000 to 999999
     return code.toString();
   }
 
-  /// Send SMS verification code via Infobip
+  // ================== SEND SMS ==================
   static Future<bool> sendVerificationSMS({
     required String phoneNumber,
     required String verificationCode,
@@ -32,7 +31,7 @@ class SMSService {
       final body = {
         "messages": [
           {
-            "from": "Internify", // Sender name (max 11 chars) or number
+            "from": "Internify", // max 11 chars or number
             "destinations": [
               {"to": formattedPhone}
             ],
@@ -41,6 +40,15 @@ class SMSService {
           }
         ]
       };
+
+      print('📡 Sending SMS to: $formattedPhone');
+      print('🌐 URL: $url');
+      print('🧾 Headers: ${{
+        'Authorization': 'App $_apiKey',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      }}');
+      print('📦 Body: ${jsonEncode(body)}');
 
       final response = await http.post(
         url,
@@ -67,7 +75,7 @@ class SMSService {
     }
   }
 
-  /// Format phone number to international format
+  // ================== FORMAT PHONE ==================
   static String _formatPhoneNumber(String phone) {
     String cleaned = phone.replaceAll(RegExp(r'[^\d+]'), '');
     if (!cleaned.startsWith('+')) {
@@ -80,10 +88,8 @@ class SMSService {
     return cleaned;
   }
 
-  /// Check if SMS service is configured
+  // ================== CHECK CONFIG ==================
   static bool isConfigured() {
     return _apiKey.isNotEmpty && _baseUrl.isNotEmpty;
   }
-
-
 }

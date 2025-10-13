@@ -27,6 +27,7 @@ class _VerifySMSScreenState extends State<VerifySMSScreen>
   final List<TextEditingController> _codeControllers =
   List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  //You can use focusNodes to move focus automatically to the next field.
 
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
@@ -180,20 +181,29 @@ class _VerifySMSScreenState extends State<VerifySMSScreen>
                             widget.phoneNumber,
                             textAlign: TextAlign.center,
                             style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.primaryBlue,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
                             ),
                           ),
                           const SizedBox(height: 32),
 
                           if (_controller.smsSent) ...[
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: List.generate(6, (index) {
-                                return SizedBox(
-                                  width: 45,
-                                  height: 55,
+                                return Container(
+                                  width: 42,
+                                  height: 52,
+                                  margin: EdgeInsets.symmetric(horizontal: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade50,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: AppTheme.accentBlue.withOpacity(0.3),
+                                      width: 2,
+                                    ),
+                                  ),
                                   child: KeyboardListener(
                                     focusNode: FocusNode(),
                                     onKeyEvent: (event) => _onCodeKeyEvent(index, event),
@@ -203,22 +213,15 @@ class _VerifySMSScreenState extends State<VerifySMSScreen>
                                       textAlign: TextAlign.center,
                                       keyboardType: TextInputType.number,
                                       maxLength: 1,
-                                      style: const TextStyle(
-                                        fontSize: 24,
+                                      style: TextStyle(
+                                        fontSize: 22,
                                         fontWeight: FontWeight.bold,
+                                        color: AppTheme.accentBlue,
                                       ),
                                       decoration: InputDecoration(
                                         counterText: '',
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        focusedBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                          borderSide: const BorderSide(
-                                            color: AppTheme.accentBlue,
-                                            width: 2,
-                                          ),
-                                        ),
+                                        border: InputBorder.none,
+                                        contentPadding: EdgeInsets.zero,
                                       ),
                                       inputFormatters: [
                                         FilteringTextInputFormatter.digitsOnly,
