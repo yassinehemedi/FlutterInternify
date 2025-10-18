@@ -33,7 +33,7 @@ class VerifySMSController {
   final TextEditingController confirmPasswordController = TextEditingController();
 
 
-  Future<void> sendVerificationSMS1() async {
+  Future<void> sendVerificationSMS() async {
     // 🔥 COMMENT OUT THE CONFIG CHECK
     // if (!SMSService.isConfigured()) {
     //   showMessage('SMS service not configured. Please add your Brevo API key.', isError: true);
@@ -71,7 +71,7 @@ class VerifySMSController {
       showMessage('Error sending SMS: $e', isError: true);
     }
   }
-  Future<void> sendVerificationSMS() async {
+  Future<void> sendVerificationSMS1() async {
     if (!SMSService.isConfigured()) {
       showMessage('SMS service not configured. Please add your Brevo API key.', isError: true);
       return;
@@ -113,7 +113,7 @@ class VerifySMSController {
       return resendCountdown > 0;
     });
   }
-  Future<void> verifyCode1(List<TextEditingController> codeControllers, List<FocusNode> focusNodes) async {
+  Future<void> verifyCode(List<TextEditingController> codeControllers, List<FocusNode> focusNodes) async {
     final enteredCode = codeControllers.map((c) => c.text).join();
 
     if (enteredCode.length != 6) {
@@ -138,7 +138,7 @@ class VerifySMSController {
     }
     focusNodes[0].requestFocus();
   }
-  Future<void> verifyCode(List<TextEditingController> codeControllers, List<FocusNode> focusNodes) async {
+  Future<void> verifyCode1(List<TextEditingController> codeControllers, List<FocusNode> focusNodes) async {
     final enteredCode = codeControllers.map((c) => c.text).join();
 
     if (enteredCode.length != 6) {

@@ -9,11 +9,11 @@ class EmailService {
   // Brevo SMTP Configuration
   static const String _smtpHost = 'smtp-relay.brevo.com';
   static const int _smtpPort = 587;
-  static const String _smtpUsername = '855381002@smtp-brevo.com';
-  static const String _smtpPassword = 'b5zjfnKRVtc6XpQm';
+  static const String _smtpUsername = '996b2d001@smtp-brevo.com';
+  static const String _smtpPassword = 'AZy5vzX8gCYxtDJM';
 
   // Your verified sender email
-  static const String _senderEmail = 'yassinehemedi2@gmail.com';
+  static const String _senderEmail = 'yassinehemedi6@gmail.com';
   static const String _senderName = 'Internify Team';
 
   /// Generate verification token

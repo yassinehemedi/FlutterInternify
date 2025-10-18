@@ -78,6 +78,8 @@ class DatabaseHelper {
     title TEXT NOT NULL,
     description TEXT NOT NULL,
     category TEXT NOT NULL,
+    priority TEXT NOT NULL,
+    sentiment TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT "Pending",
     userId INTEGER NOT NULL,  -- INTEGER to match users.id
     createdAt TEXT NOT NULL,

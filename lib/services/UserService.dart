@@ -1,10 +1,13 @@
 
+import 'package:bcrypt/bcrypt.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/user_model.dart';
 import '../models/jobseeker_model.dart';
 import '../models/entreprise_model.dart';
 import '../database/db_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:crypto/crypto.dart';
+
 
 class UserService {
   static final UserService instance = UserService._init();
@@ -14,12 +17,19 @@ class UserService {
 
   // ==================== USER CRUD ====================
 
+
   Future<User?> registerUser(User user) async {
     final db = await _db;
 
     try {
-      final id = await db.insert('users', user.toMap());
-      final newUser = user.copyWith(id: id);
+      // Hash the password before saving
+      final hashedPassword = BCrypt.hashpw(user.password, BCrypt.gensalt());
+
+      // Create a new user object with hashed password
+      final userToSave = user.copyWith(password: hashedPassword);
+
+      final id = await db.insert('users', userToSave.toMap());
+      final newUser = userToSave.copyWith(id: id);
 
       // Create job seeker or enterprise record
       if (newUser.role == 'job_seeker') {
@@ -36,15 +46,22 @@ class UserService {
 
   Future<User?> loginUser(String email, String password) async {
     final db = await _db;
-    final result = await db.query('users',
-        where: 'email = ? AND password = ?', whereArgs: [email, password]);
+
+    // First, fetch user by email only
+    final result = await db.query('users', where: 'email = ?', whereArgs: [email]);
 
     if (result.isNotEmpty) {
       final user = User.fromMap(result.first);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('currentUserId', user.id!);
-      return user;
+
+      // Verify password using bcrypt
+      final isValid = BCrypt.checkpw(password, user.password);
+      if (isValid) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('currentUserId', user.id!);
+        return user;
+      }
     }
+
     return null;
   }
 
@@ -78,8 +95,13 @@ class UserService {
 
   Future<void> updateUserPassword({required String email, required String newPassword}) async {
     final db = await _db;
-    await db.update('users', {'password': newPassword}, where: 'email = ?', whereArgs: [email]);
+
+    // Hash the new password before saving
+    final hashedPassword = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+
+    await db.update('users', {'password': hashedPassword}, where: 'email = ?', whereArgs: [email]);
   }
+
 
   Future<void> deleteUser(int userId) async {
     final db = await _db;

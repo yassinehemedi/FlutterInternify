@@ -7,8 +7,12 @@ class Reclamation {
   final String description;   // Detailed message or complaint
   final String category;      // e.g., "Technical", "Service", "Payment"
   final String status;        // e.g., "Pending", "Resolved"
-  final int userId;        // ID of the user who made it
+  final int userId;           // ID of the user who made it
   final DateTime createdAt;   // Timestamp when created
+
+  // 🧠 New fields for AI analysis
+  final String? sentiment;    // "positive", "neutral", "negative"
+  final String? priority;     // "low", "normal", "high"
 
   Reclamation({
     this.id,
@@ -18,6 +22,8 @@ class Reclamation {
     required this.status,
     required this.userId,
     required this.createdAt,
+    this.sentiment,  // optional (set later by AI)
+    this.priority,   // optional (set later by AI)
   });
 
   // Convert Reclamation → Map (for SQLite or API)
@@ -30,6 +36,8 @@ class Reclamation {
       'status': status,
       'userId': userId,
       'createdAt': createdAt.toIso8601String(),
+      'sentiment': sentiment,
+      'priority': priority,
     };
   }
 
@@ -43,6 +51,8 @@ class Reclamation {
       status: map['status'],
       userId: map['userId'],
       createdAt: DateTime.parse(map['createdAt']),
+      sentiment: map['sentiment'],
+      priority: map['priority'],
     );
   }
 }

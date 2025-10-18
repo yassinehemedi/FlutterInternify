@@ -106,6 +106,8 @@ class ReclamationService {
     required String category,
     required int userId,
     DateTime? createdAt,
+    String? sentiment,      // 🧠 NEW
+    String? priority,       // 🧠 NEW
   }) async {
     try {
       final reclamation = Reclamation(
@@ -116,6 +118,8 @@ class ReclamationService {
         status: 'En cours',
         userId: userId,
         createdAt: createdAt ?? DateTime.now(),
+        sentiment: sentiment,    // 🧠 NEW
+        priority: priority,      // 🧠 NEW
       );
 
       if (id == null) {
@@ -129,7 +133,6 @@ class ReclamationService {
       return {'success': false, 'message': 'Erreur: $e'};
     }
   }
-
   // Delete reclamation - Business Logic
   Future<Map<String, dynamic>> removeReclamation(int id) async {
     try {

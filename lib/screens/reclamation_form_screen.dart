@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/reclamation.dart';
+import '../services/SentimentAnalysisService.dart';
 import '../services/reclamation_service.dart';
 
 class ReclamationFormScreen extends StatefulWidget {
@@ -24,6 +25,10 @@ class _ReclamationFormScreenState extends State<ReclamationFormScreen> {
   String _selectedCategory = 'Technique';
   bool _isLoading = false;
 
+  // 🧠 NEW: Sentiment Analysis State
+  Map<String, dynamic>? _currentAnalysis;
+  bool _showAnalysisPreview = false;
+
   @override
   void initState() {
     super.initState();
@@ -31,14 +36,79 @@ class _ReclamationFormScreenState extends State<ReclamationFormScreen> {
     _descriptionController = TextEditingController(text: widget.reclamation?.description ?? '');
     if (widget.reclamation != null) {
       _selectedCategory = widget.reclamation!.category;
+      // 🧠 NEW: Analyze existing description
+      if (widget.reclamation!.description.isNotEmpty) {
+        _analyzeDescription(widget.reclamation!.description);
+      }
     }
+    // 🧠 NEW: Listen to description changes
+    _descriptionController.addListener(_onDescriptionChanged);
   }
 
   @override
   void dispose() {
+    _descriptionController.removeListener(_onDescriptionChanged); // 🧠 NEW
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  // 🧠 NEW: Auto-analyze when description changes
+  void _onDescriptionChanged() {
+    final text = _descriptionController.text.trim();
+    if (text.length > 10) {
+      _analyzeDescription(text);
+    } else {
+      setState(() {
+        _currentAnalysis = null;
+        _showAnalysisPreview = false;
+      });
+    }
+  }
+
+  // 🧠 NEW: Perform sentiment analysis
+  void _analyzeDescription(String text) {
+    final analysis = SentimentAnalysisService.analyzeSentiment(text);
+    setState(() {
+      _currentAnalysis = analysis;
+      _showAnalysisPreview = true;
+    });
+  }
+
+  // 🧠 NEW: Get sentiment icon
+  IconData _getSentimentIcon(String sentiment) {
+    switch (sentiment) {
+      case 'positive':
+        return Icons.sentiment_satisfied_alt;
+      case 'negative':
+        return Icons.sentiment_dissatisfied;
+      default:
+        return Icons.sentiment_neutral;
+    }
+  }
+
+  // 🧠 NEW: Get sentiment color
+  Color _getSentimentColor(String sentiment) {
+    switch (sentiment) {
+      case 'positive':
+        return Colors.green;
+      case 'negative':
+        return Colors.red;
+      default:
+        return Colors.orange;
+    }
+  }
+
+  // 🧠 NEW: Get priority color
+  Color _getPriorityColor(String priority) {
+    switch (priority) {
+      case 'high':
+        return Colors.red;
+      case 'medium':
+        return Colors.orange;
+      default:
+        return Colors.green;
+    }
   }
 
   @override
@@ -130,6 +200,122 @@ class _ReclamationFormScreenState extends State<ReclamationFormScreen> {
                         validator: _service.validateDescription,
                         textCapitalization: TextCapitalization.sentences,
                       ),
+                      const SizedBox(height: 8),
+
+                      // 🧠 NEW: SENTIMENT ANALYSIS PREVIEW
+                      if (_showAnalysisPreview && _currentAnalysis != null)
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                _getSentimentColor(_currentAnalysis!['sentiment']).withOpacity(0.1),
+                                _getSentimentColor(_currentAnalysis!['sentiment']).withOpacity(0.05),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _getSentimentColor(_currentAnalysis!['sentiment']).withOpacity(0.3),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.auto_awesome,
+                                    size: 18,
+                                    color: Colors.purple[700],
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Analyse automatique',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.purple[900],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  // Sentiment
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          _getSentimentIcon(_currentAnalysis!['sentiment']),
+                                          size: 20,
+                                          color: _getSentimentColor(_currentAnalysis!['sentiment']),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Sentiment',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.grey[600],
+                                              ),
+                                            ),
+                                            Text(
+                                              _currentAnalysis!['sentiment'].toString().toUpperCase(),
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: _getSentimentColor(_currentAnalysis!['sentiment']),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Priority
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.flag,
+                                          size: 20,
+                                          color: _getPriorityColor(_currentAnalysis!['priority']),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Priorité',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.grey[600],
+                                              ),
+                                            ),
+                                            Text(
+                                              _currentAnalysis!['priority'].toString().toUpperCase(),
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: _getPriorityColor(_currentAnalysis!['priority']),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
                       const SizedBox(height: 16),
 
                       DropdownButtonFormField<String>(
@@ -207,13 +393,20 @@ class _ReclamationFormScreenState extends State<ReclamationFormScreen> {
                           if (_formKey.currentState!.validate()) {
                             setState(() => _isLoading = true);
 
+                            // 🧠 NEW: Analyze before saving
+                            final description = _descriptionController.text.trim();
+                            final analysis = SentimentAnalysisService.analyzeSentiment(description);
+
+                            // 🧠 NEW: Call saveReclamation with sentiment data
                             final result = await _service.saveReclamation(
                               id: widget.reclamation?.id,
                               title: _titleController.text.trim(),
-                              description: _descriptionController.text.trim(),
+                              description: description,
                               category: _selectedCategory,
                               userId: widget.userId,
                               createdAt: widget.reclamation?.createdAt,
+                              sentiment: analysis['sentiment'],     // 🧠 NEW
+                              priority: analysis['priority'],       // 🧠 NEW
                             );
 
                             if (mounted) {
