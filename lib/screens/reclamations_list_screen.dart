@@ -89,6 +89,62 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
     }
   }
 
+  // 🎨 NEW: Get Priority Color
+  Color _getPriorityColor(String? priority) {
+    switch (priority?.toLowerCase()) {
+      case 'high':
+        return Colors.red;
+      case 'medium':
+        return Colors.orange;
+      case 'low':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  // 🎨 NEW: Get Priority Icon
+  IconData _getPriorityIcon(String? priority) {
+    switch (priority?.toLowerCase()) {
+      case 'high':
+        return Icons.priority_high;
+      case 'medium':
+        return Icons.flag;
+      case 'low':
+        return Icons.flag_outlined;
+      default:
+        return Icons.flag_outlined;
+    }
+  }
+
+  // 🎨 NEW: Get Sentiment Icon
+  IconData _getSentimentIcon(String? sentiment) {
+    switch (sentiment?.toLowerCase()) {
+      case 'positive':
+        return Icons.sentiment_satisfied_alt;
+      case 'negative':
+        return Icons.sentiment_dissatisfied;
+      case 'neutral':
+        return Icons.sentiment_neutral;
+      default:
+        return Icons.sentiment_neutral;
+    }
+  }
+
+  // 🎨 NEW: Get Sentiment Color
+  Color _getSentimentColor(String? sentiment) {
+    switch (sentiment?.toLowerCase()) {
+      case 'positive':
+        return Colors.green;
+      case 'negative':
+        return Colors.red;
+      case 'neutral':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final statistics = _statsService.calculateStatistics(_reclamations);
@@ -98,7 +154,7 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
       _selectedCategory,
     );
 
-    return Scaffold(//skeleton of a page
+    return Scaffold(
       appBar: AppBar(
         title: const Text('Mes Réclamations'),
         backgroundColor: Colors.blue[700],
@@ -159,14 +215,14 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
             : Column(
           children: [
             // Statistics Summary Card
-            Padding(//adds space outside the card.
+            Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
               child: Card(
                 elevation: 4,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: InkWell(//makes the card tappable
+                child: InkWell(
                   onTap: () {
                     Navigator.push(
                       context,
@@ -203,7 +259,7 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
                           ),
                         ),
                         const SizedBox(width: 16),
-                        Expanded(//Expanded → makes this column take all remaining horizontal space.
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -434,11 +490,19 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
                     _service.getStatusColorName(reclamation.status),
                   );
 
+                  // 🎨 Get priority and sentiment colors
+                  final priorityColor = _getPriorityColor(reclamation.priority);
+                  final sentimentColor = _getSentimentColor(reclamation.sentiment);
+
                   return Card(
                     elevation: 3,
                     margin: const EdgeInsets.only(bottom: 16, top: 8),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
+                      // 🎨 NEW: Add colored border for high priority
+                      side: reclamation.priority?.toLowerCase() == 'high'
+                          ? BorderSide(color: Colors.red.shade300, width: 2)
+                          : BorderSide.none,
                     ),
                     child: InkWell(
                       onTap: () async {
@@ -459,6 +523,7 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // 🎨 TITLE + STATUS ROW
                             Row(
                               children: [
                                 Expanded(
@@ -496,6 +561,8 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
                               ],
                             ),
                             const SizedBox(height: 8),
+
+                            // DESCRIPTION
                             Text(
                               reclamation.description,
                               maxLines: 2,
@@ -506,6 +573,126 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
+
+                            // 🎨 NEW: PRIORITY & SENTIMENT BADGES
+                            if (reclamation.priority != null || reclamation.sentiment != null)
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                margin: const EdgeInsets.only(bottom: 12),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.purple[50]!,
+                                      Colors.blue[50]!,
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: Colors.purple[200]!,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    // 🎨 PRIORITY BADGE
+                                    if (reclamation.priority != null)
+                                      Expanded(
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(6),
+                                              decoration: BoxDecoration(
+                                                color: priorityColor.withOpacity(0.2),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Icon(
+                                                _getPriorityIcon(reclamation.priority),
+                                                size: 18,
+                                                color: priorityColor,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Priorité',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: Colors.grey[600],
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  reclamation.priority!.toUpperCase(),
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: priorityColor,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+
+                                    // 🎨 DIVIDER
+                                    if (reclamation.priority != null && reclamation.sentiment != null)
+                                      Container(
+                                        height: 40,
+                                        width: 1,
+                                        margin: const EdgeInsets.symmetric(horizontal: 8),
+                                        color: Colors.grey[300],
+                                      ),
+
+                                    // 🎨 SENTIMENT BADGE
+                                    if (reclamation.sentiment != null)
+                                      Expanded(
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(6),
+                                              decoration: BoxDecoration(
+                                                color: sentimentColor.withOpacity(0.2),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Icon(
+                                                _getSentimentIcon(reclamation.sentiment),
+                                                size: 18,
+                                                color: sentimentColor,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Sentiment',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: Colors.grey[600],
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  reclamation.sentiment!.toUpperCase(),
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: sentimentColor,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+
+                            // CATEGORY + DATE
                             Row(
                               children: [
                                 Icon(Icons.category_outlined,
@@ -533,6 +720,8 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
                               ],
                             ),
                             const SizedBox(height: 12),
+
+                            // ACTION BUTTONS
                             Row(
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [

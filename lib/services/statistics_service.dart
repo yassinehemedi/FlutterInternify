@@ -96,7 +96,7 @@ class StatisticsService {
   // Get summary text for quick view
   String getSummaryText(Map<String, dynamic> statistics) {
     final byStatus = statistics['byStatus'] as Map<String, int>;
-    final enCours = byStatus['En Cours'] ?? 0;
+    final enCours = byStatus['En cours'] ?? 0;
     final terminee = byStatus['Terminée'] ?? 0;
 
     return '$enCours En Cours | $terminee Terminée${byStatus.length > 2 ? ' | +${byStatus.length - 2}' : ''}';

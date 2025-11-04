@@ -1,357 +1,105 @@
 import 'package:sqflite/sqflite.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-/// Sentiment Analysis Service - 100% Dart - English Only
-/// Extensive English keyword database for maximum accuracy
+/// Sentiment Analysis Service - LLM-Powered Only
+/// Calls Python API to analyze reclamations
 class SentimentAnalysisService {
 
-  // VERY NEGATIVE WORDS (1 star) - 150+ words
-  static const List<String> _veryNegativeWords = [
-    // Extreme adjectives
-    'abysmal', 'appalling', 'atrocious', 'awful', 'catastrophic',
-    'deplorable', 'despicable', 'detestable', 'dire', 'disastrous',
-    'disgusting', 'dreadful', 'egregious', 'execrable', 'frightful',
-    'ghastly', 'grievous', 'heinous', 'hideous', 'horrendous',
-    'horrible', 'horrid', 'horrific', 'horrifying', 'insufferable',
-    'intolerable', 'lamentable', 'loathsome', 'miserable', 'monstrous',
-    'nauseating', 'odious', 'outrageous', 'pathetic', 'reprehensible',
-    'repugnant', 'repulsive', 'revolting', 'rotten', 'shameful',
-    'shocking', 'sickening', 'terrible', 'tragic', 'unbearable',
-    'unforgivable', 'vile', 'wretched', 'abhorrent', 'contemptible',
+  // 🔥 API Configuration - Set to your computer's IP
+  // Your IP from ipconfig: 192.168.236.1
+  static String _apiUrl = 'http://192.168.1.111:8000/analyze_priority';
+  static const Duration _apiTimeout = Duration(seconds: 60);
 
-    // Strong negative nouns
-    'catastrophe', 'debacle', 'disaster', 'failure', 'fiasco',
-    'nightmare', 'outrage', 'scam', 'scandal', 'travesty',
-    'garbage', 'junk', 'trash', 'waste', 'mess',
+  /// Change API URL dynamically (useful for testing)
+  static void setApiUrl(String url) {
+    _apiUrl = url;
+    print('🔧 API URL updated to: $_apiUrl');
+  }
 
-    // Extreme verbs
-    'hate', 'loathe', 'despise', 'abhor', 'detest',
-    'ruined', 'destroyed', 'wrecked', 'devastated', 'failed',
-
-    // Strong expressions
-    'worst ever', 'never again', 'stay away', 'avoid at all costs',
-    'complete waste', 'total disaster', 'utter failure', 'absolute garbage',
-
-    // Profanity-adjacent (clean)
-    'crap', 'crappy', 'sucks', 'sucked', 'sucky',
-  ];
-
-  // NEGATIVE WORDS (2 stars) - 200+ words
-  static const List<String> _negativeWords = [
-    // Negative adjectives
-    'bad', 'poor', 'inferior', 'subpar', 'mediocre',
-    'inadequate', 'insufficient', 'lacking', 'deficient', 'unsatisfactory',
-    'disappointing', 'dissatisfying', 'frustrating', 'annoying', 'irritating',
-    'aggravating', 'bothersome', 'troublesome', 'problematic', 'faulty',
-    'defective', 'flawed', 'imperfect', 'damaged', 'broken',
-    'buggy', 'glitchy', 'unstable', 'unreliable', 'inconsistent',
-    'slow', 'sluggish', 'laggy', 'delayed', 'late',
-    'overpriced', 'expensive', 'costly', 'unaffordable', 'cheap',
-    'tacky', 'shabby', 'shoddy', 'lousy', 'lame',
-    'boring', 'dull', 'tedious', 'uninteresting', 'bland',
-    'uncomfortable', 'awkward', 'clumsy', 'difficult', 'hard',
-    'complicated', 'confusing', 'unclear', 'vague', 'ambiguous',
-    'useless', 'pointless', 'worthless', 'ineffective', 'inefficient',
-    'unprofessional', 'rude', 'disrespectful', 'unhelpful', 'unresponsive',
-
-    // Negative nouns
-    'problem', 'issue', 'error', 'bug', 'glitch',
-    'defect', 'flaw', 'fault', 'mistake', 'failure',
-    'disappointment', 'letdown', 'hassle', 'inconvenience', 'trouble',
-    'delay', 'setback', 'complication', 'difficulty', 'concern',
-
-    // Negative verbs
-    'dislike', 'disappointed', 'regret', 'complain', 'unsatisfied',
-    'unhappy', 'displeased', 'annoyed', 'frustrated', 'upset',
-    'broke', 'crashed', 'failed', 'stopped', 'malfunctioned',
-    'lagged', 'froze', 'hung', 'stalled', 'glitched',
-
-    // Expressions
-    'not good', 'not great', 'not satisfied', 'not happy',
-    'could be better', 'needs improvement', 'fell short', 'below expectations',
-    'waste of money', 'waste of time', 'not worth it', 'not recommended',
-  ];
-
-  // NEUTRAL WORDS (3 stars) - 100+ words
-  static const List<String> _neutralWords = [
-    // Neutral adjectives
-    'okay', 'ok', 'fine', 'acceptable', 'adequate',
-    'average', 'normal', 'standard', 'typical', 'regular',
-    'moderate', 'fair', 'reasonable', 'decent', 'tolerable',
-    'passable', 'satisfactory', 'sufficient', 'serviceable', 'basic',
-
-    // Neutral expressions
-    'nothing special', 'as expected', 'what i expected', 'no complaints',
-    'no issues', 'works fine', 'does the job', 'gets the job done',
-    'neither good nor bad', 'middle of the road', 'run of the mill',
-  ];
-
-  // POSITIVE WORDS (4 stars) - 200+ words
-  static const List<String> _positiveWords = [
-    // Positive adjectives
-    'good', 'nice', 'fine', 'great', 'pleasant',
-    'enjoyable', 'satisfying', 'satisfactory', 'pleasing', 'agreeable',
-    'comfortable', 'convenient', 'helpful', 'useful', 'practical',
-    'functional', 'effective', 'efficient', 'reliable', 'dependable',
-    'solid', 'sturdy', 'durable', 'quality', 'well-made',
-    'professional', 'polite', 'courteous', 'friendly', 'responsive',
-    'fast', 'quick', 'speedy', 'prompt', 'timely',
-    'easy', 'simple', 'straightforward', 'clear', 'intuitive',
-    'affordable', 'reasonable', 'fair-priced', 'value', 'worth',
-    'attractive', 'pretty', 'stylish', 'elegant', 'modern',
-    'clean', 'neat', 'tidy', 'organized', 'well-designed',
-    'smooth', 'seamless', 'hassle-free', 'trouble-free', 'stable',
-
-    // Positive nouns
-    'quality', 'value', 'benefit', 'advantage', 'plus',
-    'strength', 'feature', 'improvement', 'upgrade', 'enhancement',
-
-    // Positive verbs
-    'like', 'enjoy', 'appreciate', 'recommend', 'satisfied',
-    'happy', 'pleased', 'content', 'glad', 'impressed',
-    'works', 'functions', 'performs', 'delivers', 'exceeds',
-
-    // Positive expressions
-    'pretty good', 'quite good', 'fairly good', 'rather nice',
-    'well done', 'good job', 'nice work', 'solid choice',
-    'happy with', 'satisfied with', 'pleased with', 'glad i bought',
-    'worth buying', 'worth the money', 'good value', 'bang for buck',
-  ];
-
-  // VERY POSITIVE WORDS (5 stars) - 200+ words
-  static const List<String> _veryPositiveWords = [
-    // Extreme positive adjectives
-    'amazing', 'awesome', 'excellent', 'exceptional', 'extraordinary',
-    'fabulous', 'fantastic', 'phenomenal', 'remarkable', 'spectacular',
-    'splendid', 'stunning', 'superb', 'superior', 'supreme',
-    'terrific', 'tremendous', 'wonderful', 'wondrous', 'magnificent',
-    'marvelous', 'miraculous', 'outstanding', 'perfect', 'flawless',
-    'impeccable', 'pristine', 'exquisite', 'sublime', 'divine',
-    'brilliant', 'genius', 'incredible', 'unbelievable', 'mind-blowing',
-    'breathtaking', 'jaw-dropping', 'eye-opening', 'game-changing', 'revolutionary',
-    'top-notch', 'first-class', 'world-class', 'best-in-class', 'premium',
-    'elite', 'deluxe', 'luxury', 'high-end', 'top-tier',
-
-    // Superlatives
-    'best', 'finest', 'greatest', 'ultimate', 'supreme',
-    'perfect', 'ideal', 'optimal', 'quintessential', 'definitive',
-
-    // Strong positive nouns
-    'masterpiece', 'gem', 'treasure', 'blessing', 'godsend',
-    'miracle', 'perfection', 'excellence', 'brilliance', 'triumph',
-
-    // Enthusiastic verbs
-    'love', 'adore', 'cherish', 'treasure', 'worship',
-    'obsessed', 'addicted', 'hooked', 'blown away', 'amazed',
-    'impressed', 'astounded', 'astonished', 'stunned', 'wowed',
-
-    // Extreme positive expressions
-    'absolutely amazing', 'totally awesome', 'completely perfect',
-    'beyond expectations', 'exceeded expectations', 'blew me away',
-    'knocked my socks off', 'out of this world', 'second to none',
-    'best ever', 'best purchase', 'highly recommend', 'must have',
-    'must buy', 'cant live without', 'life changing', 'game changer',
-    '10 out of 10', '5 stars', 'five stars', 'top quality',
-    'worth every penny', 'money well spent', 'no regrets',
-  ];
-
-  // INTENSIFIERS - Make sentiment stronger
-  static const List<String> _intensifiers = [
-    'very', 'really', 'extremely', 'incredibly', 'absolutely',
-    'totally', 'completely', 'utterly', 'entirely', 'thoroughly',
-    'highly', 'super', 'ultra', 'mega', 'exceptionally',
-    'particularly', 'especially', 'remarkably', 'extraordinarily', 'significantly',
-    'seriously', 'genuinely', 'truly', 'honestly', 'literally',
-    'so', 'such', 'too', 'way', 'quite',
-  ];
-
-  // DIMINISHERS - Make sentiment weaker
-  static const List<String> _diminishers = [
-    'somewhat', 'slightly', 'a bit', 'a little', 'kind of',
-    'sort of', 'kinda', 'sorta', 'fairly', 'rather',
-    'pretty', 'quite', 'relatively', 'moderately', 'partially',
-  ];
-
-  // NEGATIONS - Reverse sentiment
-  static const List<String> _negations = [
-    'not', 'no', 'never', 'none', 'nobody',
-    'nothing', 'neither', 'nowhere', 'dont', "don't",
-    'doesnt', "doesn't", 'didnt', "didn't", 'wont', "won't",
-    'wouldnt', "wouldn't", 'cant', "can't", 'cannot',
-    'shouldnt', "shouldn't", 'isnt', "isn't", 'arent', "aren't",
-    'wasnt', "wasn't", 'werent', "weren't", 'hasnt', "hasn't",
-    'havent', "haven't", 'hadnt', "hadn't",
-  ];
-
-  // CONTRASTING WORDS - Signal sentiment shift
-  static const List<String> _contrasts = [
-    'but', 'however', 'although', 'though', 'yet',
-    'still', 'nevertheless', 'nonetheless', 'except', 'besides',
-  ];
-
-  /// Analyze sentiment of text
-  static Map<String, dynamic> analyzeSentiment(String text) {
+  /// Main sentiment analysis - Calls LLM API ONLY
+  static Future<Map<String, dynamic>> analyzeSentiment(String text) async {
     if (text.trim().isEmpty) {
-      return _createResult('neutral', 3, 0.5, 'Empty text');
+      print('⚠️ Empty text provided, returning neutral defaults');
+      return _createResult('neutral', 3, 0.5, 'empty-text', 'medium');
     }
 
-    final lowerText = text.toLowerCase();
-    final words = _tokenize(lowerText);
+    try {
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('🔍 LLM ANALYSIS STARTED');
+      print('📝 Text: ${text.substring(0, text.length > 100 ? 100 : text.length)}...');
+      print('🌐 API URL: $_apiUrl');
+      print('⏰ Timeout: $_apiTimeout');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-    // Calculate scores
-    double veryNegativeScore = _countKeywords(words, _veryNegativeWords) * 5.0;
-    double negativeScore = _countKeywords(words, _negativeWords) * 3.0;
-    double neutralScore = _countKeywords(words, _neutralWords) * 1.0;
-    double positiveScore = _countKeywords(words, _positiveWords) * 3.0;
-    double veryPositiveScore = _countKeywords(words, _veryPositiveWords) * 5.0;
+      // Call Python LLM API
+      final response = await http.post(
+        Uri.parse(_apiUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'description': text}),
+      ).timeout(_apiTimeout);
 
-    // Apply intensifiers
-    if (_hasAny(words, _intensifiers)) {
-      veryNegativeScore *= 1.5;
-      negativeScore *= 1.3;
-      positiveScore *= 1.3;
-      veryPositiveScore *= 1.5;
-    }
+      print('📡 HTTP Status: ${response.statusCode}');
+      print('📦 Response Body: ${response.body}');
 
-    // Apply diminishers
-    if (_hasAny(words, _diminishers)) {
-      veryNegativeScore *= 0.7;
-      negativeScore *= 0.8;
-      positiveScore *= 0.8;
-      veryPositiveScore *= 0.7;
-    }
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
 
-    // Handle negations (reverse sentiment)
-    if (_hasAny(words, _negations)) {
-      final tempNeg = negativeScore;
-      final tempVeryNeg = veryNegativeScore;
-      negativeScore = positiveScore * 0.9;
-      veryNegativeScore = veryPositiveScore * 0.9;
-      positiveScore = tempNeg * 0.9;
-      veryPositiveScore = tempVeryNeg * 0.9;
-    }
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        print('✅ LLM ANALYSIS SUCCESS!');
+        print('🎯 Priority: ${data['priority']}');
+        print('😊 Sentiment: ${data['sentiment']}');
+        print('🤖 Method: LLM-based');
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-    // Analyze punctuation
-    final punctScore = _analyzePunctuation(text);
-    if (punctScore < 0) {
-      negativeScore += punctScore.abs() * 2;
-    } else {
-      positiveScore += punctScore * 2;
-    }
+        // Map priority to stars (for compatibility)
+        final stars = _priorityToStars(data['priority'] ?? 'medium');
 
-    // Analyze emojis
-    final emojiScore = _analyzeEmojis(text);
-    if (emojiScore < 0) {
-      negativeScore += emojiScore.abs() * 3;
-    } else {
-      positiveScore += emojiScore * 3;
-    }
+        // Return LLM results ONLY
+        return {
+          'sentiment': data['sentiment'] ?? 'neutral',
+          'stars': stars,
+          'confidence': 0.9, // High confidence since it's from LLM
+          'priority': data['priority'] ?? 'medium',
+          'method': 'llm-api',
+        };
+      } else {
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        print('❌ LLM API ERROR');
+        print('💥 Status Code: ${response.statusCode}');
+        print('📄 Response: ${response.body}');
+        print('⚠️ FALLING BACK TO NEUTRAL DEFAULTS');
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-    // Analyze CAPS (shouting)
-    if (_hasCapsWords(text)) {
-      negativeScore *= 1.2;
-    }
-
-    // Calculate totals
-    final totalNegative = veryNegativeScore + negativeScore;
-    final totalPositive = veryPositiveScore + positiveScore;
-    final totalAll = totalNegative + totalPositive + neutralScore;
-
-    // Determine sentiment
-    String sentiment;
-    int stars;
-    double confidence;
-
-    if (totalAll == 0) {
-      sentiment = 'neutral';
-      stars = 3;
-      confidence = 0.5;
-    } else if (totalNegative > totalPositive * 1.2) {
-      sentiment = 'negative';
-      stars = veryNegativeScore > negativeScore ? 1 : 2;
-      confidence = (totalNegative / totalAll).clamp(0.0, 1.0);
-    } else if (totalPositive > totalNegative * 1.2) {
-      sentiment = 'positive';
-      stars = veryPositiveScore > positiveScore ? 5 : 4;
-      confidence = (totalPositive / totalAll).clamp(0.0, 1.0);
-    } else {
-      sentiment = 'neutral';
-      stars = 3;
-      confidence = 0.6;
-    }
-
-    return _createResult(sentiment, stars, confidence, 'rule-based');
-  }
-
-  /// Tokenize text into words
-  /// Tokenize text into words
-  static List<String> _tokenize(String text) {
-    return text
-        .split(RegExp(r'''[\s,;:.!?()\[\]{}"']'''))
-        .where((w) => w.isNotEmpty)
-        .toList();
-  }
-
-
-
-  /// Count keyword matches
-  static int _countKeywords(List<String> words, List<String> keywords) {
-    int count = 0;
-    for (var word in words) {
-      if (keywords.contains(word)) {
-        count++;
+        // Return neutral defaults on API error
+        return _createResult('neutral', 3, 0.3, 'api-error', 'medium');
       }
+
+    } catch (e, stackTrace) {
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('💥 LLM API EXCEPTION');
+      print('❌ Error: $e');
+      print('📍 Stack: ${stackTrace.toString().split('\n').take(3).join('\n')}');
+      print('⚠️ Returning neutral defaults');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      // Return neutral defaults on exception
+      return _createResult('neutral', 3, 0.3, 'api-exception', 'medium');
     }
-    // Check for multi-word phrases
-    final fullText = words.join(' ');
-    for (var keyword in keywords) {
-      if (keyword.contains(' ') && fullText.contains(keyword)) {
-        count += 2; // Multi-word phrases count more
-      }
+  }
+
+  /// Convert priority to star rating
+  static int _priorityToStars(String priority) {
+    switch (priority.toLowerCase()) {
+      case 'high':
+        return 1; // Critical = 1 star
+      case 'medium':
+        return 3; // Medium = 3 stars
+      case 'low':
+        return 5; // Low priority/positive = 5 stars
+      default:
+        return 3;
     }
-    return count;
-  }
-
-  /// Check if any keyword exists
-  static bool _hasAny(List<String> words, List<String> keywords) {
-    return words.any((w) => keywords.contains(w));
-  }
-
-  /// Analyze punctuation
-  static double _analyzePunctuation(String text) {
-    double score = 0;
-
-    // Multiple exclamation marks = emphasis
-    if (text.contains('!!!') || text.contains('!!')) score += 1.5;
-    else if (text.contains('!')) score += 0.5;
-
-    // Multiple question marks = concern/confusion
-    if (text.contains('???') || text.contains('??')) score -= 1.5;
-    else if (text.contains('?')) score -= 0.3;
-
-    // All caps = shouting (usually negative)
-    if (text.contains(RegExp(r'[A-Z]{4,}'))) score -= 1.0;
-
-    return score;
-  }
-
-  /// Analyze emojis
-  static double _analyzeEmojis(String text) {
-    double score = 0;
-
-    // Negative emojis
-    final negativeEmojis = RegExp(r'[😠😡🤬😤😞😔😢😭😩😫😖😣😟😕🙁☹️💔😰😨😱]');
-    score -= negativeEmojis.allMatches(text).length * 2;
-
-    // Positive emojis
-    final positiveEmojis = RegExp(r'[😀😃😄😁😆😊🙂😍🥰😘❤️💚💙💛🧡💜👍👏✅✨🎉🎊⭐🌟💪🔥]');
-    score += positiveEmojis.allMatches(text).length * 2;
-
-    return score;
-  }
-
-  /// Check for CAPS words
-  static bool _hasCapsWords(String text) {
-    return RegExp(r'\b[A-Z]{3,}\b').hasMatch(text);
   }
 
   /// Create result map
@@ -360,39 +108,35 @@ class SentimentAnalysisService {
       int stars,
       double confidence,
       String method,
+      String priority,
       ) {
     return {
       'sentiment': sentiment,
       'stars': stars,
       'confidence': confidence.clamp(0.0, 1.0),
       'method': method,
-      'priority': _determinePriority(sentiment, confidence),
+      'priority': priority,
     };
   }
 
-  /// Determine priority based on sentiment
-  static String _determinePriority(String sentiment, double confidence) {
-    if (sentiment == 'negative' && confidence > 0.7) {
-      return 'high';
-    } else if (sentiment == 'negative') {
-      return 'medium';
-    } else if (sentiment == 'positive') {
-      return 'low';
-    } else {
-      return 'medium';
-    }
-  }
-
-  /// Analyze and update complaint in database
+  /// Update complaint in database with LLM analysis
   static Future<void> analyzeAndUpdateComplaint(
       Database db,
       int complaintId,
       String complaintText,
       ) async {
-    final analysis = analyzeSentiment(complaintText);
+    print('\n📋 Analyzing complaint #$complaintId');
+
+    final analysis = await analyzeSentiment(complaintText);
+
+    print('💾 Updating database for complaint #$complaintId');
+    print('   - Sentiment: ${analysis['sentiment']}');
+    print('   - Priority: ${analysis['priority']}');
+    print('   - Stars: ${analysis['stars']}');
+    print('   - Method: ${analysis['method']}');
 
     await db.update(
-      'complaints',
+      'reclamations',
       {
         'sentiment': analysis['sentiment'],
         'stars': analysis['stars'],
@@ -404,26 +148,55 @@ class SentimentAnalysisService {
       where: 'id = ?',
       whereArgs: [complaintId],
     );
+
+    print('✅ Database updated for complaint #$complaintId\n');
   }
 
-  /// Analyze all pending complaints
+  /// Analyze all pending complaints using LLM
   static Future<int> analyzeAllPending(Database db) async {
+    print('\n🚀 Starting batch analysis of pending complaints...');
+
     final complaints = await db.query(
-      'complaints',
+      'reclamations',
       where: 'sentiment IS NULL OR sentiment = ?',
       whereArgs: [''],
     );
 
+    print('📊 Found ${complaints.length} pending complaints');
+
     int analyzed = 0;
-    for (var complaint in complaints) {
+    int failed = 0;
+
+    for (var i = 0; i < complaints.length; i++) {
+      final complaint = complaints[i];
       final id = complaint['id'] as int;
       final text = complaint['description'] as String? ?? '';
 
+      print('\n[${ i + 1}/${complaints.length}] Processing complaint #$id');
+
       if (text.isNotEmpty) {
-        await analyzeAndUpdateComplaint(db, id, text);
-        analyzed++;
+        try {
+          await analyzeAndUpdateComplaint(db, id, text);
+          analyzed++;
+          print('✅ Success ($analyzed/${complaints.length})');
+        } catch (e) {
+          failed++;
+          print('❌ Failed: $e');
+        }
+
+        // Small delay to avoid overwhelming API
+        await Future.delayed(Duration(milliseconds: 500));
+      } else {
+        print('⚠️ Skipped (empty text)');
       }
     }
+
+    print('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    print('📈 BATCH ANALYSIS COMPLETE');
+    print('✅ Analyzed: $analyzed');
+    print('❌ Failed: $failed');
+    print('📊 Total: ${complaints.length}');
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
     return analyzed;
   }
@@ -437,7 +210,7 @@ class SentimentAnalysisService {
       GROUP BY sentiment
     ''');
 
-    return {
+    final stats = {
       'positive': 0,
       'neutral': 0,
       'negative': 0,
@@ -448,6 +221,13 @@ class SentimentAnalysisService {
         )),
       ),
     };
+
+    print('📊 Sentiment Statistics:');
+    stats.forEach((key, value) {
+      print('   - ${key.toUpperCase()}: $value');
+    });
+
+    return stats;
   }
 
   /// Get complaints by priority
@@ -455,17 +235,106 @@ class SentimentAnalysisService {
       Database db,
       String priority,
       ) async {
-    return await db.query(
+    final results = await db.query(
       'reclamations',
       where: 'priority = ?',
       whereArgs: [priority],
       orderBy: 'analyzed_at DESC',
     );
+
+    print('🔍 Found ${results.length} complaints with priority: $priority');
+    return results;
+  }
+
+  /// Get CRITICAL complaints only (high priority + negative)
+  static Future<List<Map<String, dynamic>>> getCriticalComplaints(Database db) async {
+    final results = await db.query(
+      'reclamations',
+      where: 'priority = ? AND sentiment = ?',
+      whereArgs: ['high', 'negative'],
+      orderBy: 'analyzed_at DESC',
+    );
+
+    print('🚨 Found ${results.length} CRITICAL complaints');
+    return results;
+  }
+
+  /// Test LLM connection with detailed diagnostics
+  static Future<bool> testConnection() async {
+    print('\n🧪 Testing LLM API connection...');
+    print('🌐 Target: $_apiUrl');
+
+    try {
+      // Test 1: Check health endpoint first
+      final healthUrl = _apiUrl.replaceAll('/analyze_priority', '/health');
+      print('\n📡 Step 1: Testing health endpoint...');
+      print('   URL: $healthUrl');
+
+      final healthStart = DateTime.now();
+      final healthResponse = await http.get(Uri.parse(healthUrl))
+          .timeout(Duration(seconds: 5));
+      final healthTime = DateTime.now().difference(healthStart).inMilliseconds;
+
+      print('   Status: ${healthResponse.statusCode}');
+      print('   Time: ${healthTime}ms');
+      print('   Body: ${healthResponse.body}');
+
+      if (healthResponse.statusCode != 200) {
+        print('❌ Health check failed!');
+        return false;
+      }
+
+      print('✅ Health check passed!');
+
+      // Test 2: Try actual analysis with short text
+      print('\n📡 Step 2: Testing analysis endpoint...');
+      final analysisStart = DateTime.now();
+      final testText = 'Test';
+
+      final response = await http.post(
+        Uri.parse(_apiUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'description': testText}),
+      ).timeout(Duration(seconds: 60));
+
+      final analysisTime = DateTime.now().difference(analysisStart).inMilliseconds;
+
+      print('   Status: ${response.statusCode}');
+      print('   Time: ${analysisTime}ms');
+      print('   Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['priority'] != null && data['sentiment'] != null) {
+          print('✅ LLM API is working correctly!');
+          print('⚡ Average response time: ${analysisTime}ms');
+
+          if (analysisTime > 30000) {
+            print('⚠️ WARNING: API is very slow (>${analysisTime/1000}s)');
+            print('   Consider increasing timeout or optimizing API');
+          }
+
+          return true;
+        }
+      }
+
+      print('⚠️ Unexpected response format');
+      return false;
+
+    } catch (e) {
+      print('❌ Connection test failed: $e');
+      print('\n💡 Troubleshooting:');
+      print('   1. Check if FastAPI is running: uvicorn main:app --host 0.0.0.0 --port 8000');
+      print('   2. Verify IP address in code matches your computer\'s IP');
+      print('   3. Ensure phone and computer are on same WiFi');
+      print('   4. Check firewall settings on your computer');
+      return false;
+    }
   }
 }
 
-// Extension for easy use
+// Easy extension to use
 extension SentimentExtension on String {
-  Map<String, dynamic> get sentiment =>
-      SentimentAnalysisService.analyzeSentiment(this);
+  Future<Map<String, dynamic>> get sentiment async =>
+      await SentimentAnalysisService.analyzeSentiment(this);
 }
