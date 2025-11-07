@@ -227,4 +227,54 @@ class EventService {
     }
     return newlyExpiredEvents;
   }
+
+  Map<String, dynamic> calculateDailyStatistics(List<Event> events) {
+    if (events.isEmpty) {
+      return {
+        'typePercentages': {},
+        'inProgressPercentage': 0.0,
+        'donePercentage': 0.0,
+        'motivationalMessage': 'No events for this day.',
+      };
+    }
+
+    int totalEvents = events.length;
+    Map<String, int> typeCounts = {'task': 0, 'meeting': 0, 'report': 0};
+    int inProgressCount = 0;
+    int doneCount = 0;
+
+    for (var event in events) {
+      if (typeCounts.containsKey(event.type)) {
+        typeCounts[event.type] = typeCounts[event.type]! + 1;
+      }
+      if (event.status == 'in progress') {
+        inProgressCount++;
+      }
+      if (event.status == 'done') {
+        doneCount++;
+      }
+    }
+
+    Map<String, double> typePercentages = typeCounts.map((key, value) => MapEntry(key, (value / totalEvents) * 100));
+
+    double inProgressPercentage = (inProgressCount / totalEvents) * 100;
+    double donePercentage = (doneCount / totalEvents) * 100;
+
+    String motivationalMessage;
+    if (donePercentage > 90) {
+      motivationalMessage = 'Very Good!';
+    } else if (donePercentage >= 70) {
+      motivationalMessage = 'A little bit left!';
+    } else {
+      motivationalMessage = 'You need to do more!';
+    }
+
+    return {
+      'typePercentages': typePercentages,
+      'inProgressPercentage': inProgressPercentage,
+      'donePercentage': donePercentage,
+      'motivationalMessage': motivationalMessage,
+    };
+  }
+
 }

@@ -112,6 +112,173 @@ class _AgendaScreenState extends State<AgendaScreen> {
     );
   }
 
+  void _showDailyStatistics(BuildContext context, List<Event> dailyEvents) {
+    final stats = _eventService.calculateDailyStatistics(dailyEvents);
+    final typePercentages = stats['typePercentages'] as Map<String, double>;
+    final inProgressPercentage = stats['inProgressPercentage'] as double;
+    final donePercentage = stats['donePercentage'] as double;
+    final motivationalMessage = stats['motivationalMessage'] as String;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (_, controller) {
+            return Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.blue[700]!, Colors.blue[50]!],
+                  stops: const [0.0, 0.4],
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: ListView(
+                controller: controller,
+                padding: const EdgeInsets.all(20),
+                children: [
+                  Center(
+                    child: Text(
+                      'Daily Performance',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildPieChart(typePercentages),
+                  const SizedBox(height: 20),
+                  _buildStatCard('In Progress', inProgressPercentage, Icons.directions_run, Colors.orange),
+                  const SizedBox(height: 12),
+                  _buildStatCard('Done', donePercentage, Icons.check_circle, Colors.green),
+                  const SizedBox(height: 20),
+                  _buildMotivationalCard(motivationalMessage),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPieChart(Map<String, double> data) {
+    List<Widget> legend = [];
+    List<Widget> chartBars = [];
+    final colors = {'task': Colors.purple, 'meeting': Colors.teal, 'report': Colors.amber};
+
+    data.forEach((key, value) {
+      if (value > 0) {
+        legend.add(_buildLegendItem(colors[key]!, key));
+        chartBars.add(Flexible(flex: value.toInt(), child: Container(color: colors[key]!)));
+      }
+    });
+
+    return Card(
+      color: Colors.white.withOpacity(0.9),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Text('Event Types Breakdown', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue[900])),
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(height: 20, child: Row(children: chartBars)),
+            ),
+            const SizedBox(height: 16),
+            Wrap(spacing: 20, runSpacing: 8, children: legend),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(Color color, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(width: 12, height: 12, color: color),
+        const SizedBox(width: 8),
+        Text(text[0].toUpperCase() + text.substring(1), style: TextStyle(color: Colors.blue[900])),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(String title, double percentage, IconData icon, Color color) {
+    return Card(
+      color: Colors.white.withOpacity(0.9),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue[900])),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(icon, color: color, size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: LinearProgressIndicator(
+                    value: percentage / 100,
+                    backgroundColor: color.withOpacity(0.2),
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                    minHeight: 10,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text('${percentage.toStringAsFixed(1)}%', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue[900])),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMotivationalCard(String message) {
+    Color cardColor;
+    IconData icon;
+    switch (message) {
+      case 'Very Good!':
+        cardColor = Colors.green[700]!;
+        icon = Icons.star;
+        break;
+      case 'A little bit left!':
+        cardColor = Colors.orange[700]!;
+        icon = Icons.trending_up;
+        break;
+      default:
+        cardColor = Colors.red[700]!;
+        icon = Icons.warning;
+    }
+
+    return Card(
+        color: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: Colors.white, size: 24),
+              const SizedBox(width: 12),
+              Text(
+                message,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ],
+          ),
+        ));
+  }
+
 
   @override
   void dispose() {
@@ -296,13 +463,32 @@ class _AgendaScreenState extends State<AgendaScreen> {
               } else {
                 final events = snapshot.data!;
                 events.sort((a, b) => a.deadlineTime.compareTo(b.deadlineTime));
-                return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  itemCount: events.length,
-                  itemBuilder: (context, index) {
-                    Event event = events[index];
-                    return _buildEventCard(event, true);
-                  },
+                return Column(
+                  children: [
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        itemCount: events.length,
+                        itemBuilder: (context, index) {
+                          Event event = events[index];
+                          return _buildEventCard(event, true);
+                        },
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showDailyStatistics(context, events),
+                        icon: const Icon(Icons.bar_chart, color: Colors.white),
+                        label: const Text('Rate my performance', style: TextStyle(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue[700],
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                      ),
+                    )
+                  ],
                 );
               }
             },
