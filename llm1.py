@@ -42,16 +42,30 @@ class PriorityResponse(BaseModel):
 def classify_priority(description: str) -> dict:
     start_time = time.time()
 
-    prompt = f"""Analyze this customer complaint and classify:
+    prompt = f"""Analyze this customer complaint and classify based on URGENCY and tone:
 
 Complaint: "{description}"
 
-Return:
-- priority: "high" (urgent: account issues, payment, security, harassment) | "medium" (bugs, features) | "low" (feedback, questions)
-- sentiment: "negative" (angry/frustrated) | "neutral" (factual) | "positive" (happy/satisfied)
+Priority Classification (based on BUSINESS IMPACT, not anger):
+- "high": Critical issues affecting service (account locked, payment failed, data loss, security breach, service completely broken, cannot access account)
+- "medium": Non-critical problems (bugs, feature requests, service degradation, slow performance)
+- "low": General feedback, questions, suggestions, insults without specific issue, complaints about minor inconveniences
 
-JSON only:
-{{"priority": "...", "sentiment": "..."}}"""
+Sentiment Classification (based on TONE):
+- "negative": Angry, frustrated, disappointed, upset tone
+- "neutral": Factual, calm, informative tone
+- "positive": Happy, satisfied, grateful tone
+
+Examples:
+- "fuck you" → priority: low, sentiment: negative (just venting, no actual issue)
+- "I can't login to my account" → priority: high, sentiment: negative (critical blocker)
+- "The app is slow sometimes" → priority: medium, sentiment: neutral
+- "Payment failed 3 times" → priority: high, sentiment: negative (critical financial issue)
+- "Could you add dark mode?" → priority: low, sentiment: neutral (feature request)
+- "Your support sucks" → priority: low, sentiment: negative (complaint without issue)
+
+Return ONLY valid JSON:
+{{"priority": "high|medium|low", "sentiment": "negative|neutral|positive"}}"""
 
     try:
         print(f"🔍 Analyzing: {description[:80]}...")

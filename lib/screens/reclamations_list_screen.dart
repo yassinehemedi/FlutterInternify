@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/reclamation.dart';
 import '../services/reclamation_service.dart';
 import '../services/statistics_service.dart';
@@ -7,10 +8,8 @@ import 'reclamation_form_screen.dart';
 import 'reclamation_statistics_screen.dart';
 
 class ReclamationsListScreen extends StatefulWidget {
-  final int userId;
-
-  const ReclamationsListScreen({Key? key, required this.userId})
-      : super(key: key);
+  // ✅ REMOVED: No longer requires userId parameter
+  const ReclamationsListScreen({Key? key}) : super(key: key);
 
   @override
   State<ReclamationsListScreen> createState() => _ReclamationsListScreenState();
@@ -21,6 +20,9 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
   final StatisticsService _statsService = StatisticsService();
   final SearchService _searchService = SearchService();
   final TextEditingController _searchController = TextEditingController();
+
+  // ✅ NEW: Add userId state variable
+  int? _userId;
 
   List<Reclamation> _reclamations = [];
   List<Reclamation> _filteredReclamations = [];
@@ -35,7 +37,8 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
     super.initState();
     _selectedStatus = 'Tous';
     _selectedCategory = 'Toutes';
-    _loadData();
+    // ✅ MODIFIED: Load userId first, then load data
+    _loadUserId();
   }
 
   @override
@@ -44,9 +47,48 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
     super.dispose();
   }
 
-  Future<void> _loadData() async {
+  // ✅ NEW: Load userId from SharedPreferences
+  Future<void> _loadUserId() async {
     setState(() => _isLoading = true);
-    final data = await _service.getReclamationsByUserId(widget.userId);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getInt('currentUserId');
+
+      if (userId != null) {
+        setState(() => _userId = userId);
+        await _loadData();
+      } else {
+        // Handle case where userId is not found
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Session expirée. Veuillez vous reconnecter.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          // Navigate back to login or home
+          Navigator.of(context).pop();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur de chargement: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // ✅ MODIFIED: Use _userId instead of widget.userId
+  Future<void> _loadData() async {
+    if (_userId == null) return;
+
+    setState(() => _isLoading = true);
+    final data = await _service.getReclamationsByUserId(_userId!);
     setState(() {
       _reclamations = data;
       _availableStatuses = ['Tous', ..._statsService.getUniqueStatuses(data)];
@@ -89,7 +131,6 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
     }
   }
 
-  // 🎨 NEW: Get Priority Color
   Color _getPriorityColor(String? priority) {
     switch (priority?.toLowerCase()) {
       case 'high':
@@ -103,7 +144,6 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
     }
   }
 
-  // 🎨 NEW: Get Priority Icon
   IconData _getPriorityIcon(String? priority) {
     switch (priority?.toLowerCase()) {
       case 'high':
@@ -117,7 +157,6 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
     }
   }
 
-  // 🎨 NEW: Get Sentiment Icon
   IconData _getSentimentIcon(String? sentiment) {
     switch (sentiment?.toLowerCase()) {
       case 'positive':
@@ -131,7 +170,6 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
     }
   }
 
-  // 🎨 NEW: Get Sentiment Color
   Color _getSentimentColor(String? sentiment) {
     switch (sentiment?.toLowerCase()) {
       case 'positive':
@@ -490,7 +528,6 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
                     _service.getStatusColorName(reclamation.status),
                   );
 
-                  // 🎨 Get priority and sentiment colors
                   final priorityColor = _getPriorityColor(reclamation.priority);
                   final sentimentColor = _getSentimentColor(reclamation.sentiment);
 
@@ -499,18 +536,17 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
                     margin: const EdgeInsets.only(bottom: 16, top: 8),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
-                      // 🎨 NEW: Add colored border for high priority
                       side: reclamation.priority?.toLowerCase() == 'high'
                           ? BorderSide(color: Colors.red.shade300, width: 2)
                           : BorderSide.none,
                     ),
                     child: InkWell(
                       onTap: () async {
+                        // ✅ MODIFIED: ReclamationFormScreen will also use SharedPreferences
                         final result = await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => ReclamationFormScreen(
-                              userId: widget.userId,
                               reclamation: reclamation,
                             ),
                           ),
@@ -523,7 +559,6 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 🎨 TITLE + STATUS ROW
                             Row(
                               children: [
                                 Expanded(
@@ -562,7 +597,6 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
                             ),
                             const SizedBox(height: 8),
 
-                            // DESCRIPTION
                             Text(
                               reclamation.description,
                               maxLines: 2,
@@ -574,7 +608,6 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
                             ),
                             const SizedBox(height: 12),
 
-                            // 🎨 NEW: PRIORITY & SENTIMENT BADGES
                             if (reclamation.priority != null || reclamation.sentiment != null)
                               Container(
                                 padding: const EdgeInsets.all(10),
@@ -594,7 +627,6 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
                                 ),
                                 child: Row(
                                   children: [
-                                    // 🎨 PRIORITY BADGE
                                     if (reclamation.priority != null)
                                       Expanded(
                                         child: Row(
@@ -637,7 +669,6 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
                                         ),
                                       ),
 
-                                    // 🎨 DIVIDER
                                     if (reclamation.priority != null && reclamation.sentiment != null)
                                       Container(
                                         height: 40,
@@ -646,7 +677,6 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
                                         color: Colors.grey[300],
                                       ),
 
-                                    // 🎨 SENTIMENT BADGE
                                     if (reclamation.sentiment != null)
                                       Expanded(
                                         child: Row(
@@ -692,7 +722,6 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
                                 ),
                               ),
 
-                            // CATEGORY + DATE
                             Row(
                               children: [
                                 Icon(Icons.category_outlined,
@@ -721,18 +750,17 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
                             ),
                             const SizedBox(height: 12),
 
-                            // ACTION BUTTONS
                             Row(
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
                                 TextButton.icon(
                                   onPressed: () async {
+                                    // ✅ MODIFIED: No userId parameter
                                     final result = await Navigator.push(
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) =>
                                             ReclamationFormScreen(
-                                              userId: widget.userId,
                                               reclamation: reclamation,
                                             ),
                                       ),
@@ -812,10 +840,11 @@ class _ReclamationsListScreenState extends State<ReclamationsListScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
+          // ✅ MODIFIED: No userId parameter
           final result = await Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ReclamationFormScreen(userId: widget.userId),
+              builder: (context) => ReclamationFormScreen(),
             ),
           );
           if (result == true) _loadData();

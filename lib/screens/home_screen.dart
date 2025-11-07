@@ -201,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => ReclamationsListScreen(userId: _controller.user!.id!),
+                        builder: (context) => ReclamationsListScreen(),
                       ),
                     );
                   } else {

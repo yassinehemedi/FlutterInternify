@@ -6,9 +6,8 @@ import 'dart:convert';
 /// Calls Python API to analyze reclamations
 class SentimentAnalysisService {
 
-  // 🔥 API Configuration - Set to your computer's IP
-  // Your IP from ipconfig: 192.168.236.1
-  static String _apiUrl = 'http://192.168.1.111:8000/analyze_priority';
+
+  static String _apiUrl = 'http://192.168.1.34:8000/analyze_priority';
   static const Duration _apiTimeout = Duration(seconds: 60);
 
   /// Change API URL dynamically (useful for testing)
