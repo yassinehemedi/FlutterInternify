@@ -43,7 +43,7 @@ class _UpdateEventScreenState extends State<UpdateEventScreen> {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime(2000), // Allow past dates for editing
+      firstDate: DateTime.now(), // Prevent selecting past dates
       lastDate: DateTime(2101),
     );
     if (picked != null && picked != _selectedDate) {
@@ -108,12 +108,6 @@ class _UpdateEventScreenState extends State<UpdateEventScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Update Event'),
-        backgroundColor: Colors.blue[700],
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -136,7 +130,6 @@ class _UpdateEventScreenState extends State<UpdateEventScreen> {
                     key: _formKey,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           'Edit Event Details',
@@ -146,12 +139,38 @@ class _UpdateEventScreenState extends State<UpdateEventScreen> {
                         TextFormField(
                           controller: _titleController,
                           decoration: InputDecoration(labelText: 'Title *', prefixIcon: Icon(Icons.title, color: Colors.blue[700]), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), filled: true, fillColor: Colors.blue[50]),
-                          validator: (value) => value == null || value.isEmpty ? 'Title is required' : null,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Title is required';
+                            }
+                            if (value.length < 5) {
+                              return 'Title must be at least 5 characters long';
+                            }
+                            if (value.length > 50) {
+                              return 'Title cannot exceed 50 characters';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _descriptionController,
-                          decoration: InputDecoration(labelText: 'Description', prefixIcon: Icon(Icons.description, color: Colors.blue[700]), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), filled: true, fillColor: Colors.blue[50]),
+                          decoration: InputDecoration(labelText: 'Description *', prefixIcon: Icon(Icons.description, color: Colors.blue[700]), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), filled: true, fillColor: Colors.blue[50]),
+                          keyboardType: TextInputType.multiline,
+                          minLines: 3,
+                          maxLines: null,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Description is required';
+                            }
+                            if (value.length < 10) {
+                              return 'Description must be at least 10 characters long';
+                            }
+                            if (value.length > 100) {
+                              return 'Description cannot exceed 100 characters';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 24),
                         Text('Event Type *', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue[800])),
@@ -203,10 +222,61 @@ class _UpdateEventScreenState extends State<UpdateEventScreen> {
                         ElevatedButton(
                           onPressed: _isLoading ? null : () async {
                             if (_formKey.currentState!.validate()) {
+                              final title = _titleController.text.trim();
+                              final exists = await _eventService.eventTitleExists(title, widget.event.userId, currentEventId: widget.event.id);
+                              if (exists) {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    title: const Text('Duplicate Title', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    content: const Text(
+                                      'An event with this title already exists.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(),
+                                        child: const Text('OK'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                return;
+                              }
+
+                              final deadline = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, _selectedTime.hour, _selectedTime.minute);
+                              if (deadline.isBefore(DateTime.now())) {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    title: const Text('Invalid Deadline', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    content: const Text(
+                                      'Deadline cannot be in the past.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(),
+                                        child: const Text('OK'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                return;
+                              }
+
                               setState(() => _isLoading = true);
                               final updatedEvent = Event(
                                 id: widget.event.id,
-                                title: _titleController.text,
+                                title: title,
                                 description: _descriptionController.text,
                                 type: _selectedType,
                                 creationDate: widget.event.creationDate,

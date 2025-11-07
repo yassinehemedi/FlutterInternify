@@ -133,7 +133,6 @@ class _AddEventScreenState extends State<AddEventScreen> {
                     key: _formKey,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           'Create a New Event',
@@ -154,19 +153,46 @@ class _AddEventScreenState extends State<AddEventScreen> {
                             filled: true,
                             fillColor: Colors.blue[50],
                           ),
-                          validator: (value) => value == null || value.isEmpty ? 'Title is required' : null,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Title is required';
+                            }
+                            if (value.length < 5) {
+                              return 'Title must be at least 5 characters long';
+                            }
+                            if (value.length > 50) {
+                              return 'Title cannot exceed 50 characters';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _descriptionController,
                           decoration: InputDecoration(
-                            labelText: 'Description',
+                            labelText: 'Description *',
                             hintText: 'e.g., Discuss project progress',
                             prefixIcon: Icon(Icons.description, color: Colors.blue[700]),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             filled: true,
                             fillColor: Colors.blue[50],
+                            alignLabelWithHint: true,
                           ),
+                          keyboardType: TextInputType.multiline,
+                          minLines: 3,
+                          maxLines: null,
+                           validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Description is required';
+                            }
+                            if (value.length < 10) {
+                              return 'Description must be at least 10 characters long';
+                            }
+                            if (value.length > 100) {
+                              return 'Description cannot exceed 100 characters';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 24),
                         Text('Event Type *', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue[800])),
@@ -218,16 +244,85 @@ class _AddEventScreenState extends State<AddEventScreen> {
                         ElevatedButton(
                           onPressed: _isLoading ? null : () async {
                             if (_formKey.currentState!.validate()) {
-                              if (_selectedDate == null || _selectedTime == null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Please select a deadline date and time'), backgroundColor: Colors.red),
+                              final title = _titleController.text.trim();
+                              final exists = await _eventService.eventTitleExists(title, widget.userId);
+                              if (exists) {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    title: const Text('Duplicate Title', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    content: const Text(
+                                      'An event with this title already exists.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(),
+                                        child: const Text('OK'),
+                                      ),
+                                    ],
+                                  ),
                                 );
                                 return;
                               }
+
+                              if (_selectedDate == null || _selectedTime == null) {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    title: const Text('Missing Deadline', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    content: const Text(
+                                      'Please select a deadline date and time.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(),
+                                        child: const Text('OK'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                return;
+                              }
+
+                              final deadline = DateTime(_selectedDate!.year, _selectedDate!.month, _selectedDate!.day, _selectedTime!.hour, _selectedTime!.minute);
+                              if (deadline.isBefore(DateTime.now())) {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    title: const Text('Invalid Deadline', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    content: const Text(
+                                      'Deadline cannot be in the past.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(),
+                                        child: const Text('OK'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                return;
+                              }
+
                               setState(() => _isLoading = true);
                               final now = DateTime.now();
                               final event = Event(
-                                title: _titleController.text,
+                                title: title,
                                 description: _descriptionController.text,
                                 type: _selectedType,
                                 creationDate: DateFormat('yyyy-MM-dd').format(now),

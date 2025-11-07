@@ -66,8 +66,8 @@ class _EventScreenState extends State<EventScreen> {
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: 100,
-          width: 100,
+          height: 140,
+          width: 140,
           child: AnalogClock(
             datetime: dateTime,
             isLive: false,
@@ -76,8 +76,8 @@ class _EventScreenState extends State<EventScreen> {
               color: Colors.transparent,
               shape: BoxShape.circle,
             ),
-            width: 100.0,
-            height: 100.0,
+            width: 140.0,
+            height: 140.0,
             hourHandColor: Colors.blue[900]!,
             minuteHandColor: Colors.blue[700]!,
             numberColor: Colors.blue[800]!,

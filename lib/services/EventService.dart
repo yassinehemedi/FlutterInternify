@@ -72,4 +72,28 @@ class EventService {
       whereArgs: [id],
     );
   }
+
+  // Check if an event title exists for a user
+  Future<bool> eventTitleExists(String title, int userId, {int? currentEventId}) async {
+    final db = await _dbHelper.database;
+    List<Map<String, dynamic>> maps;
+    if (currentEventId != null) {
+      // For updates, ignore the current event's ID
+      maps = await db.query(
+        'events',
+        where: 'title = ? AND userId = ? AND id != ?',
+        whereArgs: [title, userId, currentEventId],
+        limit: 1,
+      );
+    } else {
+      // For adds, just check title and userId
+      maps = await db.query(
+        'events',
+        where: 'title = ? AND userId = ?',
+        whereArgs: [title, userId],
+        limit: 1,
+      );
+    }
+    return maps.isNotEmpty;
+  }
 }
