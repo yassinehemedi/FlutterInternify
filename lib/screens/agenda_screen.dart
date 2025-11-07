@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:date_picker_timeline/date_picker_timeline.dart';
 import 'package:intl/intl.dart';
@@ -20,6 +21,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
   final EventService _eventService = EventService();
   final TextEditingController _searchController = TextEditingController();
   String _selectedStatusFilter = 'All';
+  Timer? _timer;
 
   // Future to hold the list of all events, fetched only once.
   late Future<List<Event>> _allEventsFuture;
@@ -27,16 +29,93 @@ class _AgendaScreenState extends State<AgendaScreen> {
   @override
   void initState() {
     super.initState();
-    // Fetch all events when the screen is first initialized.
-    _allEventsFuture = _eventService.getEvents(widget.userId);
+    _loadEvents();
     _searchController.addListener(() {
       // Rebuild the widget to apply the filter instantly.
       setState(() {});
     });
+    // Set up a timer to check for expired events every 5 seconds.
+    _timer = Timer.periodic(const Duration(seconds: 5), (Timer t) async {
+      if (!mounted) return; // Add a mounted check
+      final List<Event> newlyExpiredEvents = await _eventService.updateExpiredEvents(widget.userId);
+      if (newlyExpiredEvents.isNotEmpty && mounted) {
+        // If events were updated, show an alert and refresh the list.
+        _showExpiredEventsDialog(newlyExpiredEvents);
+        _loadEvents();
+      }
+    });
   }
+
+  Future<void> _loadEvents() async {
+    if (mounted) {
+      setState(() {
+        _allEventsFuture = _eventService.getEvents(widget.userId);
+      });
+    }
+  }
+  
+  void _showExpiredEventsDialog(List<Event> expiredEvents) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange[700]),
+            const SizedBox(width: 12),
+            const Text('Events Expired', style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'The following events have passed their deadlines:',
+                style: TextStyle(fontSize: 16, color: Colors.grey[800])
+              ),
+              const SizedBox(height: 16),
+              ...expiredEvents.map((event) => Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Row(
+                  children: [
+                    Icon(Icons.label_important, color: Colors.red[300], size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        event.title,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[900],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue[700],
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('OK', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   @override
   void dispose() {
+    _timer?.cancel(); // Cancel the timer to avoid memory leaks.
     _searchController.dispose();
     super.dispose();
   }
@@ -133,9 +212,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
           );
           if (result == true) {
             // Refresh the list if an event was added
-            setState(() {
-              _allEventsFuture = _eventService.getEvents(widget.userId);
-            });
+            _loadEvents();
           }
         },
         child: const Icon(Icons.add, color: Colors.white),
@@ -198,7 +275,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                 return const Center(child: CircularProgressIndicator(color: Colors.white));
               } else if (snapshot.hasError) {
                 return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(color: Colors.red[300])));
-              } else if (!snapshot.hasData S|| snapshot.data!.isEmpty) {
+              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -385,6 +462,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   Widget _buildEventCard(Event event, bool isCalendarView) {
     final statusColor = _getStatusColor(event.status);
+    final isExpired = event.status == 'expired';
 
     return Card(
       elevation: 3,
@@ -392,6 +470,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
+      color: isExpired ? Colors.red[100] : Colors.white,
       child: InkWell(
         onTap: () async {
           final result = await Navigator.push(
@@ -402,9 +481,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
           );
           if (result == true) {
             // Refresh the list if an event was updated or deleted
-            setState(() {
-              _allEventsFuture = _eventService.getEvents(widget.userId);
-            });
+            _loadEvents();
           }
         },
         borderRadius: BorderRadius.circular(12),
@@ -415,7 +492,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
             children: [
               Row(
                 children: [
-                  Icon(_getTypeIcon(event.type), color: Colors.blue[600], size: 24),
+                  Icon(
+                    _getTypeIcon(event.type), 
+                    color: isExpired ? Colors.red[700] : Colors.blue[600], 
+                    size: 24
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -423,7 +504,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.blue[900],
+                        color: isExpired ? Colors.red[900] : Colors.blue[900],
                       ),
                     ),
                   ),
@@ -453,7 +534,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                     event.description,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                    style: TextStyle(color: isExpired ? Colors.red[800] : Colors.grey[700]),
                   ),
                 ),
               const Divider(),
@@ -466,23 +547,23 @@ class _AgendaScreenState extends State<AgendaScreen> {
                       Icon(
                         isCalendarView ? Icons.access_time : Icons.calendar_today,
                         size: 16,
-                        color: Colors.grey[600],
+                        color: isExpired ? Colors.red[700] : Colors.grey[600],
                       ),
                       const SizedBox(width: 4),
                       Text(
                         isCalendarView ? 'Deadline: ${event.deadlineTime}' : 'Deadline: ${event.deadlineDate}',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                        style: TextStyle(color: isExpired ? Colors.red[800] : Colors.grey[600], fontSize: 13),
                       ),
                     ],
                   ),
                   if (!isCalendarView) // Only show time on the right for List view
                     Row(
                       children: [
-                        Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+                        Icon(Icons.access_time, size: 16, color: isExpired ? Colors.red[700] : Colors.grey[600]),
                         const SizedBox(width: 4),
                         Text(
                           event.deadlineTime,
-                          style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                          style: TextStyle(color: isExpired ? Colors.red[800] : Colors.grey[600], fontSize: 13),
                         ),
                       ],
                     ),

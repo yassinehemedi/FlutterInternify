@@ -134,12 +134,6 @@ class _EventScreenState extends State<EventScreen> {
       setState(() => _isDeleting = true);
       await _eventService.deleteEvent(_currentEvent.id!);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Event deleted successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
         Navigator.pop(context, true); // Return true to refresh the previous screen
       }
     }
@@ -148,6 +142,7 @@ class _EventScreenState extends State<EventScreen> {
   @override
   Widget build(BuildContext context) {
     final statusColor = _getStatusColor(_currentEvent.status);
+    final isExpired = _currentEvent.status == 'expired';
 
     return WillPopScope(
       onWillPop: () async {
@@ -157,7 +152,7 @@ class _EventScreenState extends State<EventScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Event'),
-          backgroundColor: Colors.blue[700],
+          backgroundColor: isExpired ? Colors.red[700] : Colors.blue[700],
           foregroundColor: Colors.white,
           elevation: 0,
           leading: IconButton(
@@ -171,7 +166,7 @@ class _EventScreenState extends State<EventScreen> {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Colors.blue[700]!, Colors.blue[50]!],
+              colors: [isExpired ? Colors.red[700]! : Colors.blue[700]!, isExpired ? Colors.red[50]! : Colors.blue[50]!],
               stops: const [0.0, 0.4],
             ),
           ),
@@ -266,41 +261,43 @@ class _EventScreenState extends State<EventScreen> {
                       const SizedBox(height: 24),
                       Row(
                         children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () async {
-                                final result = await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => UpdateEventScreen(event: _currentEvent),
-                                  ),
-                                );
-                                if (result == true) {
-                                  _hasBeenUpdated = true; // Set the flag
-                                  final updatedEvent = await _eventService.getEventById(_currentEvent.id!);
-                                  if (updatedEvent != null) {
-                                    setState(() {
-                                      _currentEvent = updatedEvent;
-                                    });
+                          if (!isExpired)
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => UpdateEventScreen(event: _currentEvent),
+                                    ),
+                                  );
+                                  if (result == true) {
+                                    _hasBeenUpdated = true; // Set the flag
+                                    final updatedEvent = await _eventService.getEventById(_currentEvent.id!);
+                                    if (updatedEvent != null) {
+                                      setState(() {
+                                        _currentEvent = updatedEvent;
+                                      });
+                                    }
                                   }
-                                }
-                              },
-                              icon: const Icon(Icons.edit),
-                              label: const Text('Update'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.blue[700],
-                                side: BorderSide(color: Colors.blue[700]!),
+                                },
+                                icon: const Icon(Icons.edit),
+                                label: const Text('Update'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.blue[700],
+                                  side: BorderSide(color: Colors.blue[700]!),
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 16),
+                          if (!isExpired)
+                            const SizedBox(width: 16),
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: _isDeleting ? null : _deleteEvent,
                               icon: _isDeleting
                                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                                   : const Icon(Icons.delete_outline, color: Colors.white),
-                              label: const Text('Delete', style: TextStyle(color: Colors.white)),
+                              label: const Text('Delete'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.red,
                               ),
