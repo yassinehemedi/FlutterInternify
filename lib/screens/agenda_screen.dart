@@ -192,11 +192,13 @@ class _AgendaScreenState extends State<AgendaScreen> {
                   ),
                 );
               } else {
+                final events = snapshot.data!;
+                events.sort((a, b) => a.deadlineTime.compareTo(b.deadlineTime));
                 return ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  itemCount: snapshot.data!.length,
+                  itemCount: events.length,
                   itemBuilder: (context, index) {
-                    Event event = snapshot.data![index];
+                    Event event = events[index];
                     return _buildEventCard(event, true);
                   },
                 );
@@ -240,11 +242,17 @@ class _AgendaScreenState extends State<AgendaScreen> {
             ),
           );
         } else {
+          final events = snapshot.data!;
+          events.sort((a, b) {
+            final aDeadline = DateFormat('yyyy-MM-dd HH:mm').parse('${a.deadlineDate} ${a.deadlineTime}');
+            final bDeadline = DateFormat('yyyy-MM-dd HH:mm').parse('${b.deadlineDate} ${b.deadlineTime}');
+            return aDeadline.compareTo(bDeadline);
+          });
           return ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            itemCount: snapshot.data!.length,
+            itemCount: events.length,
             itemBuilder: (context, index) {
-              Event event = snapshot.data![index];
+              Event event = events[index];
               return _buildEventCard(event, false);
             },
           );
