@@ -18,6 +18,27 @@ class _AgendaScreenState extends State<AgendaScreen> {
   int _currentIndex = 0;
   DateTime _selectedDate = DateTime.now();
   final EventService _eventService = EventService();
+  final TextEditingController _searchController = TextEditingController();
+
+  // Future to hold the list of all events, fetched only once.
+  late Future<List<Event>> _allEventsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch all events when the screen is first initialized.
+    _allEventsFuture = _eventService.getEvents(widget.userId);
+    _searchController.addListener(() {
+      // Rebuild the widget to apply the filter instantly.
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   // Helper method to get color based on status
   Color _getStatusColor(String status) {
@@ -110,7 +131,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
             ),
           );
           if (result == true) {
-            setState(() {});
+            // Refresh the list if an event was added
+            setState(() {
+              _allEventsFuture = _eventService.getEvents(widget.userId);
+            });
           }
         },
         child: const Icon(Icons.add, color: Colors.white),
@@ -211,53 +235,87 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   Widget _buildListView() {
-    return FutureBuilder<List<Event>>(
-      future: _eventService.getEvents(widget.userId),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: Colors.white));
-        } else if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(color: Colors.red[300])));
-        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.event_busy_outlined, size: 80, color: Colors.blue[300]),
-                const SizedBox(height: 16),
-                Text(
-                  'No events found',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.blue[900],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Tap the + button to add one',
-                  style: TextStyle(color: Colors.blue[700]),
-                ),
-              ],
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search by title, description...',
+              prefixIcon: Icon(Icons.search, color: Colors.blue[700]),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
             ),
-          );
-        } else {
-          final events = snapshot.data!;
-          events.sort((a, b) {
-            final aDeadline = DateFormat('yyyy-MM-dd HH:mm').parse('${a.deadlineDate} ${a.deadlineTime}');
-            final bDeadline = DateFormat('yyyy-MM-dd HH:mm').parse('${b.deadlineDate} ${b.deadlineTime}');
-            return aDeadline.compareTo(bDeadline);
-          });
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            itemCount: events.length,
-            itemBuilder: (context, index) {
-              Event event = events[index];
-              return _buildEventCard(event, false);
+          ),
+        ),
+        Expanded(
+          child: FutureBuilder<List<Event>>(
+            future: _allEventsFuture, // Use the single future here
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator(color: Colors.white));
+              } else if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(color: Colors.red[300])));
+              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.event_busy_outlined, size: 80, color: Colors.blue[300]),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No events found',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.blue[900],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              } else {
+                // Filter and sort the already-fetched list in memory
+                final allEvents = snapshot.data!;
+                final filteredEvents = _eventService.filterEvents(allEvents, _searchController.text);
+                filteredEvents.sort((a, b) {
+                  final aDeadline = DateFormat('yyyy-MM-dd HH:mm').parse('${a.deadlineDate} ${a.deadlineTime}');
+                  final bDeadline = DateFormat('yyyy-MM-dd HH:mm').parse('${b.deadlineDate} ${b.deadlineTime}');
+                  return aDeadline.compareTo(bDeadline);
+                });
+
+                if (_searchController.text.isNotEmpty && filteredEvents.isEmpty) {
+                  return Center(
+                    child: Text('No results found', style: TextStyle(color: Colors.blue[900], fontSize: 18)),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  itemCount: filteredEvents.length,
+                  itemBuilder: (context, index) {
+                    Event event = filteredEvents[index];
+                    return _buildEventCard(event, false);
+                  },
+                );
+              }
             },
-          );
-        }
-      },
+          ),
+        ),
+      ],
     );
   }
 
@@ -279,7 +337,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
             ),
           );
           if (result == true) {
-            setState(() {});
+            // Refresh the list if an event was updated or deleted
+            setState(() {
+              _allEventsFuture = _eventService.getEvents(widget.userId);
+            });
           }
         },
         borderRadius: BorderRadius.circular(12),

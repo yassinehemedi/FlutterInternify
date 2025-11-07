@@ -96,4 +96,19 @@ class EventService {
     }
     return maps.isNotEmpty;
   }
+
+  // Filter events based on a search query
+  List<Event> filterEvents(List<Event> events, String query) {
+    if (query.isEmpty) {
+      return events;
+    }
+    final lowerCaseQuery = query.toLowerCase();
+    return events.where((event) {
+      final titleMatch = event.title.toLowerCase().contains(lowerCaseQuery);
+      final descriptionMatch = event.description.toLowerCase().contains(lowerCaseQuery);
+      final typeMatch = event.type.toLowerCase().contains(lowerCaseQuery);
+      final statusMatch = event.status.toLowerCase().contains(lowerCaseQuery);
+      return titleMatch || descriptionMatch || typeMatch || statusMatch;
+    }).toList();
+  }
 }
