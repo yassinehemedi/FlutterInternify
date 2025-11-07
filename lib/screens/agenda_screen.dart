@@ -19,6 +19,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
   DateTime _selectedDate = DateTime.now();
   final EventService _eventService = EventService();
   final TextEditingController _searchController = TextEditingController();
+  String _selectedStatusFilter = 'All';
 
   // Future to hold the list of all events, fetched only once.
   late Future<List<Event>> _allEventsFuture;
@@ -197,7 +198,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                 return const Center(child: CircularProgressIndicator(color: Colors.white));
               } else if (snapshot.hasError) {
                 return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(color: Colors.red[300])));
-              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              } else if (!snapshot.hasData S|| snapshot.data!.isEmpty) {
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -235,30 +236,85 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   Widget _buildListView() {
+    final statusOptions = ['All', 'to do', 'in progress', 'done', 'expired'];
+
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search by title, description...',
-              prefixIcon: Icon(Icons.search, color: Colors.blue[700]),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                      },
-                    )
-                  : null,
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search...',
+                    prefixIcon: Icon(Icons.search, color: Colors.blue[700]),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () => _searchController.clear(),
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Container(
+                height: 52,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: PopupMenuButton<String>(
+                  onSelected: (String newValue) {
+                    setState(() {
+                      _selectedStatusFilter = newValue;
+                    });
+                  },
+                  itemBuilder: (BuildContext context) {
+                    return statusOptions.map((String choice) {
+                      return PopupMenuItem<String>(
+                        value: choice,
+                        child: Text(
+                          choice[0].toUpperCase() + choice.substring(1),
+                          style: TextStyle(
+                            color: Colors.blue[900],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      );
+                    }).toList();
+                  },
+                  color: Colors.blue[50],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min, 
+                      children: [
+                        Icon(Icons.filter_list, color: Colors.blue[700]),
+                        if (_selectedStatusFilter != 'All') ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            _selectedStatusFilter[0].toUpperCase() + _selectedStatusFilter.substring(1),
+                            style: TextStyle(
+                              color: Colors.blue[900],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ]
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         Expanded(
@@ -288,16 +344,24 @@ class _AgendaScreenState extends State<AgendaScreen> {
                   ),
                 );
               } else {
-                // Filter and sort the already-fetched list in memory
                 final allEvents = snapshot.data!;
-                final filteredEvents = _eventService.filterEvents(allEvents, _searchController.text);
+                
+                List<Event> statusFilteredEvents;
+                if (_selectedStatusFilter == 'All') {
+                  statusFilteredEvents = allEvents;
+                } else {
+                  statusFilteredEvents = allEvents.where((event) => event.status == _selectedStatusFilter).toList();
+                }
+
+                final filteredEvents = _eventService.filterEvents(statusFilteredEvents, _searchController.text);
+                
                 filteredEvents.sort((a, b) {
                   final aDeadline = DateFormat('yyyy-MM-dd HH:mm').parse('${a.deadlineDate} ${a.deadlineTime}');
                   final bDeadline = DateFormat('yyyy-MM-dd HH:mm').parse('${b.deadlineDate} ${b.deadlineTime}');
                   return aDeadline.compareTo(bDeadline);
                 });
 
-                if (_searchController.text.isNotEmpty && filteredEvents.isEmpty) {
+                if (filteredEvents.isEmpty) {
                   return Center(
                     child: Text('No results found', style: TextStyle(color: Colors.blue[900], fontSize: 18)),
                   );
