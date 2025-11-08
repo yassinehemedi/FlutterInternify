@@ -115,6 +115,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
   void _showDailyStatistics(BuildContext context, List<Event> dailyEvents) {
     final stats = _eventService.calculateDailyStatistics(dailyEvents);
     final typePercentages = stats['typePercentages'] as Map<String, double>;
+    final typeCounts = stats['typeCounts'] as Map<String, int>;
     final inProgressPercentage = stats['inProgressPercentage'] as double;
     final donePercentage = stats['donePercentage'] as double;
     final motivationalMessage = stats['motivationalMessage'] as String;
@@ -150,7 +151,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _buildPieChart(typePercentages),
+                  _buildPieChart(typePercentages, typeCounts),
                   const SizedBox(height: 20),
                   _buildStatCard('In Progress', inProgressPercentage, Icons.directions_run, Colors.orange),
                   const SizedBox(height: 12),
@@ -166,15 +167,32 @@ class _AgendaScreenState extends State<AgendaScreen> {
     );
   }
 
-  Widget _buildPieChart(Map<String, double> data) {
+  Widget _buildPieChart(Map<String, double> data, Map<String, int> counts) {
     List<Widget> legend = [];
     List<Widget> chartBars = [];
     final colors = {'task': Colors.purple, 'meeting': Colors.teal, 'report': Colors.amber};
 
     data.forEach((key, value) {
       if (value > 0) {
+        final count = counts[key]!;
         legend.add(_buildLegendItem(colors[key]!, key));
-        chartBars.add(Flexible(flex: value.toInt(), child: Container(color: colors[key]!)));
+        chartBars.add(Flexible(
+          flex: value.toInt(),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(color: colors[key]!),
+              Text(
+                '$count',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  shadows: [Shadow(blurRadius: 1.5, color: Colors.black54)],
+                ),
+              ),
+            ],
+          ),
+        ));
       }
     });
 
@@ -475,19 +493,20 @@ class _AgendaScreenState extends State<AgendaScreen> {
                         },
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: ElevatedButton.icon(
-                        onPressed: () => _showDailyStatistics(context, events),
-                        icon: const Icon(Icons.bar_chart, color: Colors.white),
-                        label: const Text('Rate my performance', style: TextStyle(color: Colors.white)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue[700],
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    if (events.isNotEmpty) 
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: ElevatedButton.icon(
+                          onPressed: () => _showDailyStatistics(context, events),
+                          icon: const Icon(Icons.bar_chart, color: Colors.white),
+                          label: const Text('Rate my performance', style: TextStyle(color: Colors.white)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue[700],
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          ),
                         ),
-                      ),
-                    )
+                      )
                   ],
                 );
               }
@@ -649,6 +668,14 @@ class _AgendaScreenState extends State<AgendaScreen> {
   Widget _buildEventCard(Event event, bool isCalendarView) {
     final statusColor = _getStatusColor(event.status);
     final isExpired = event.status == 'expired';
+    final isDone = event.status == 'done';
+
+    Color cardColor = Colors.white;
+    if (isExpired) {
+      cardColor = Colors.red[100]!;
+    } else if (isDone) {
+      cardColor = Colors.green[100]!;
+    }
 
     return Card(
       elevation: 3,
@@ -656,7 +683,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      color: isExpired ? Colors.red[100] : Colors.white,
+      color: cardColor,
       child: InkWell(
         onTap: () async {
           final result = await Navigator.push(
@@ -680,7 +707,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                 children: [
                   Icon(
                     _getTypeIcon(event.type), 
-                    color: isExpired ? Colors.red[700] : Colors.blue[600], 
+                    color: isExpired ? Colors.red[700] : (isDone ? Colors.green[700] : Colors.blue[600]), 
                     size: 24
                   ),
                   const SizedBox(width: 8),
@@ -690,7 +717,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: isExpired ? Colors.red[900] : Colors.blue[900],
+                        color: isExpired ? Colors.red[900] : (isDone ? Colors.green[900] : Colors.blue[900]),
                       ),
                     ),
                   ),
@@ -720,7 +747,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                     event.description,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: isExpired ? Colors.red[800] : Colors.grey[700]),
+                    style: TextStyle(color: isExpired ? Colors.red[800] : (isDone ? Colors.green[800] : Colors.grey[700])),
                   ),
                 ),
               const Divider(),
@@ -733,23 +760,23 @@ class _AgendaScreenState extends State<AgendaScreen> {
                       Icon(
                         isCalendarView ? Icons.access_time : Icons.calendar_today,
                         size: 16,
-                        color: isExpired ? Colors.red[700] : Colors.grey[600],
+                        color: isExpired ? Colors.red[700] : (isDone ? Colors.green[700] : Colors.grey[600]),
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        isCalendarView ? 'Deadline: ${event.deadlineTime}' : 'Deadline: ${event.deadlineDate}',
-                        style: TextStyle(color: isExpired ? Colors.red[800] : Colors.grey[600], fontSize: 13),
+                        isCalendarView ? event.deadlineTime : 'Deadline: ${event.deadlineDate}',
+                        style: TextStyle(color: isExpired ? Colors.red[800] : (isDone ? Colors.green[800] : Colors.grey[600]), fontSize: 13),
                       ),
                     ],
                   ),
                   if (!isCalendarView) // Only show time on the right for List view
                     Row(
                       children: [
-                        Icon(Icons.access_time, size: 16, color: isExpired ? Colors.red[700] : Colors.grey[600]),
+                        Icon(Icons.access_time, size: 16, color: isExpired ? Colors.red[700] : (isDone ? Colors.green[700] : Colors.grey[600])),
                         const SizedBox(width: 4),
                         Text(
                           event.deadlineTime,
-                          style: TextStyle(color: isExpired ? Colors.red[800] : Colors.grey[600], fontSize: 13),
+                          style: TextStyle(color: isExpired ? Colors.red[800] : (isDone ? Colors.green[800] : Colors.grey[600]), fontSize: 13),
                         ),
                       ],
                     ),

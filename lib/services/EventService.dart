@@ -235,6 +235,7 @@ class EventService {
         'inProgressPercentage': 0.0,
         'donePercentage': 0.0,
         'motivationalMessage': 'No events for this day.',
+        'typeCounts': {},
       };
     }
 
@@ -274,6 +275,7 @@ class EventService {
       'inProgressPercentage': inProgressPercentage,
       'donePercentage': donePercentage,
       'motivationalMessage': motivationalMessage,
+      'typeCounts': typeCounts,
     };
   }
 

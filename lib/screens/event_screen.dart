@@ -143,6 +143,7 @@ class _EventScreenState extends State<EventScreen> {
   Widget build(BuildContext context) {
     final statusColor = _getStatusColor(_currentEvent.status);
     final isExpired = _currentEvent.status == 'expired';
+    final isDone = _currentEvent.status == 'done';
 
     return WillPopScope(
       onWillPop: () async {
@@ -152,7 +153,7 @@ class _EventScreenState extends State<EventScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Event'),
-          backgroundColor: isExpired ? Colors.red[700] : Colors.blue[700],
+          backgroundColor: isExpired ? Colors.red[700] : (isDone ? Colors.green[700] : Colors.blue[700]),
           foregroundColor: Colors.white,
           elevation: 0,
           leading: IconButton(
@@ -166,7 +167,7 @@ class _EventScreenState extends State<EventScreen> {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [isExpired ? Colors.red[700]! : Colors.blue[700]!, isExpired ? Colors.red[50]! : Colors.blue[50]!],
+              colors: [isExpired ? Colors.red[700]! : (isDone ? Colors.green[700]! : Colors.blue[700]!), isExpired ? Colors.red[50]! : (isDone ? Colors.green[50]! : Colors.blue[50]!)],
               stops: const [0.0, 0.4],
             ),
           ),
@@ -261,7 +262,7 @@ class _EventScreenState extends State<EventScreen> {
                       const SizedBox(height: 24),
                       Row(
                         children: [
-                          if (!isExpired)
+                          if (!isExpired && !isDone)
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: () async {
@@ -289,7 +290,7 @@ class _EventScreenState extends State<EventScreen> {
                                 ),
                               ),
                             ),
-                          if (!isExpired)
+                          if (!isExpired && !isDone)
                             const SizedBox(width: 16),
                           Expanded(
                             child: ElevatedButton.icon(
