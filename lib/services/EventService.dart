@@ -2,6 +2,13 @@ import 'package:intl/intl.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:http/http.dart' as http;
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
 import '../database/db_helper.dart';
 import '../models/event.dart';
 import '../models/user_model.dart';
@@ -277,6 +284,354 @@ class EventService {
       'motivationalMessage': motivationalMessage,
       'typeCounts': typeCounts,
     };
+  }
+
+  Future<Uint8List> generatePerformanceReportPDF(int userId) async {
+    try {
+      // Get user data and events
+      final events = await getEvents(userId);
+      final user = await UserService.instance.getUserById(userId);
+      final completedEvents = events.where((e) => e.status == 'done').length;
+      final totalEvents = events.length;
+      final pendingEvents = events.where((e) => e.status == 'in progress').toList();
+      final double completionRate = totalEvents > 0 ? (completedEvents / totalEvents * 100) : 0;
+
+      // Generate analysis with Gemini
+      final geminiAnalysis = await _getGeminiAnalysis(
+        completedEvents: completedEvents,
+        totalEvents: totalEvents,
+        pendingEvents: pendingEvents,
+        completionRate: completionRate,
+      );
+
+      // Create PDF
+      return await _createPDF(
+        userName: user?.name ?? 'User',
+        events: events,
+        completedEvents: completedEvents,
+        totalEvents: totalEvents,
+        pendingEvents: pendingEvents,
+        completionRate: completionRate,
+        geminiAnalysis: geminiAnalysis,
+      );
+    } catch (e) {
+      throw Exception('PDF generation failed: $e');
+    }
+  }
+
+  Future<String> _getGeminiAnalysis({
+    required int completedEvents,
+    required int totalEvents,
+    required List<Event> pendingEvents,
+    required double completionRate,
+  }) async {
+    final prompt = """
+  Analyze this user's task performance and generate a motivational report in 150-200 words:
+  
+  Statistics:
+  - Total Tasks: $totalEvents
+  - Completed Tasks: $completedEvents
+  - Completion Rate: ${completionRate.toStringAsFixed(1)}%
+  - Pending Tasks: ${pendingEvents.length}
+  
+  Please provide:
+  1. A brief performance summary
+  2. Analysis of their productivity level
+  3. Motivational advice based on their progress
+  4. 2-3 specific suggestions for improvement
+  
+  Keep it professional, constructive and motivational. Focus on actionable insights.
+  """;
+
+    final response = await http.post(
+      Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyC_E7qqdjpyfCZpeNxa8kIfys5ibRk-bxw'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'contents': [{
+          'parts': [{'text': prompt}]
+        }]
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['candidates'][0]['content']['parts'][0]['text'];
+    } else {
+      return "Performance analysis unavailable. Focus on completing your pending tasks to improve productivity.";
+    }
+  }
+
+  Future<Uint8List> _createPDF({
+    required String userName,
+    required List<Event> events,
+    required int completedEvents,
+    required int totalEvents,
+    required List<Event> pendingEvents,
+    required double completionRate,
+    required String geminiAnalysis,
+  }) async {
+    final pdf = pw.Document();
+    final tasksPerPage = 15;
+
+    // First page
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: pw.EdgeInsets.all(20),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // Header - using simple text instead of Header widget
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    'Performance Report',
+                    style: pw.TextStyle(
+                      fontSize: 20,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.blue800,
+                    ),
+                  ),
+                  pw.Text(
+                    DateFormat('MMM dd, yyyy').format(DateTime.now()),
+                    style: pw.TextStyle(
+                      fontSize: 10,
+                      color: PdfColors.grey600,
+                    ),
+                  ),
+                ],
+              ),
+
+              pw.SizedBox(height: 10),
+              pw.Text('Report for: $userName', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 20),
+
+              // Statistics Section
+              pw.Container(
+                width: double.infinity,
+                padding: pw.EdgeInsets.all(12),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.blue300),
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('Quick Stats', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue700)),
+                    pw.SizedBox(height: 10),
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildStatItem('Total Tasks', totalEvents.toString(), PdfColors.blue700),
+                        _buildStatItem('Completed', completedEvents.toString(), PdfColors.green700),
+                        _buildStatItem('Pending', pendingEvents.length.toString(), PdfColors.orange700),
+                        _buildStatItem('Completion', '${completionRate.toStringAsFixed(1)}%', PdfColors.purple700),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              pw.SizedBox(height: 15),
+
+              // Gemini Analysis Section
+              pw.Container(
+                width: double.infinity,
+                padding: pw.EdgeInsets.all(12),
+                decoration: pw.BoxDecoration(
+                  color: PdfColors.blue50,
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('Performance Analysis', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue700)),
+                    pw.SizedBox(height: 8),
+                    pw.Text(geminiAnalysis, style: pw.TextStyle(fontSize: 10, lineSpacing: 1.3)),
+                  ],
+                ),
+              ),
+
+              pw.SizedBox(height: 15),
+
+              // Pending Tasks Preview
+              if (pendingEvents.isNotEmpty) ...[
+                pw.Text('Pending Tasks (${pendingEvents.length} total)', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue700)),
+                pw.SizedBox(height: 8),
+                if (pendingEvents.length > 5)
+                  pw.Text('Showing first 5 tasks. See next page for complete list.', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+                pw.SizedBox(height: 8),
+                _buildTasksTable(pendingEvents.take(5).toList()),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+
+    // Additional pages for remaining tasks
+    if (pendingEvents.length > 5) {
+      final remainingTasks = pendingEvents.skip(5).toList();
+
+      for (var i = 0; i < remainingTasks.length; i += tasksPerPage) {
+        final pageTasks = remainingTasks.skip(i).take(tasksPerPage).toList();
+        final pageNumber = (i ~/ tasksPerPage) + 2;
+
+        pdf.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4,
+            margin: pw.EdgeInsets.all(20),
+            build: (pw.Context context) {
+              return pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  // Simple header for continuation pages
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text(
+                        'Pending Tasks - Continued',
+                        style: pw.TextStyle(
+                          fontSize: 18,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.blue800,
+                        ),
+                      ),
+                      pw.Text(
+                        'Page $pageNumber',
+                        style: pw.TextStyle(
+                          fontSize: 10,
+                          color: PdfColors.grey600,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  pw.SizedBox(height: 15),
+                  _buildTasksTable(pageTasks),
+
+                  // Footer
+                  pw.SizedBox(height: 20),
+                  pw.Container(
+                    width: double.infinity,
+                    padding: pw.EdgeInsets.all(8),
+                    child: pw.Text(
+                      'Report for: $userName - Page $pageNumber',
+                      style: pw.TextStyle(fontSize: 9, color: PdfColors.grey500),
+                      textAlign: pw.TextAlign.center,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      }
+    }
+
+    return await pdf.save();
+  }
+
+// Helper method to build the tasks table
+  // Helper method to build the tasks table
+  // Helper method to build the tasks table
+  pw.Widget _buildTasksTable(List<Event> tasks) {
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+      columnWidths: {
+        0: pw.FlexColumnWidth(3), // Task name
+        1: pw.FlexColumnWidth(1), // Type
+        2: pw.FlexColumnWidth(1.5), // Deadline
+      },
+      defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
+      children: [
+        // Table header
+        pw.TableRow(
+          decoration: pw.BoxDecoration(color: PdfColors.blue100),
+          children: [
+            pw.Padding(
+              padding: pw.EdgeInsets.all(8),
+              child: pw.Text('Task Name', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+            ),
+            pw.Padding(
+              padding: pw.EdgeInsets.all(8),
+              child: pw.Text('Type', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+            ),
+            pw.Padding(
+              padding: pw.EdgeInsets.all(8),
+              child: pw.Text('Deadline', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+            ),
+          ],
+        ),
+        // Table rows
+        ...tasks.map((event) => pw.TableRow(
+          children: [
+            pw.Container(
+              padding: pw.EdgeInsets.all(6),
+              height: 25, // Fixed height for consistency
+              child: pw.Text(
+                _truncateText(event.title, 35),
+                style: pw.TextStyle(fontSize: 9),
+              ),
+            ),
+            pw.Padding(
+              padding: pw.EdgeInsets.all(6),
+              child: pw.Text(
+                event.type,
+                style: pw.TextStyle(fontSize: 9),
+              ),
+            ),
+            pw.Padding(
+              padding: pw.EdgeInsets.all(6),
+              child: pw.Text(
+                '${event.deadlineDate}\n${event.deadlineTime}',
+                style: pw.TextStyle(fontSize: 8),
+              ),
+            ),
+          ],
+        )).toList(),
+      ],
+    );
+  }
+
+// Helper method to truncate long text
+  String _truncateText(String text, int maxLength) {
+    if (text.length <= maxLength) {
+      return text;
+    }
+    return '${text.substring(0, maxLength - 3)}...';
+  }
+
+  pw.Widget _buildStatItem(String label, String value, PdfColor color) {
+    return pw.Column(
+      children: [
+        pw.Container(
+          width: 50,
+          height: 50,
+          decoration: pw.BoxDecoration(
+            color: color,
+            shape: pw.BoxShape.circle,
+          ),
+          child: pw.Center(
+            child: pw.Text(
+              value,
+              style: pw.TextStyle(
+                color: PdfColors.white,
+                fontSize: 12,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        pw.SizedBox(height: 5),
+        pw.Text(
+          label,
+          style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+        ),
+      ],
+    );
   }
 
 }

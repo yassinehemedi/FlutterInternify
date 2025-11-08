@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:date_picker_timeline/date_picker_timeline.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:printing/printing.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/event.dart';
 import '../services/EventService.dart';
 import 'add_event_screen.dart';
@@ -297,6 +301,203 @@ class _AgendaScreenState extends State<AgendaScreen> {
         ));
   }
 
+  void _generateAndDownloadReport() async {
+    try {
+      // Show beautiful loading snackbar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Container(
+            height: 60,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: [
+                Container(
+                  height: 40,
+                  width: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.blue[700]!.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Generating Report',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Please wait while we create your report...',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          backgroundColor: Colors.blue[800],
+          duration: const Duration(seconds: 30), // Long duration for generation
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+
+      final pdfBytes = await _eventService.generatePerformanceReportPDF(widget.userId);
+
+      // Dismiss the loading snackbar
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      // Save and share the PDF
+      final directory = await getTemporaryDirectory();
+      final file = File('${directory.path}/performance_report_${DateTime.now().millisecondsSinceEpoch}.pdf');
+      await file.writeAsBytes(pdfBytes);
+
+      // Print/share the PDF
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) => pdfBytes,
+      );
+
+      // Show success snackbar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Container(
+            height: 60,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: [
+                Container(
+                  height: 40,
+                  width: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Report Generated!',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Your report is ready to view and share',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          backgroundColor: Colors.green[700],
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    } catch (e) {
+      // Dismiss loading snackbar if there's an error
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      // Show error snackbar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Container(
+            height: 60,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: [
+                Container(
+                  height: 40,
+                  width: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.error_outline_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Generation Failed',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Failed to generate report: ${e.toString()}',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          backgroundColor: Colors.red[700],
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -522,86 +723,116 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search...',
-                    prefixIcon: Icon(Icons.search, color: Colors.blue[700]),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () => _searchController.clear(),
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                height: 52,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: PopupMenuButton<String>(
-                  onSelected: (String newValue) {
-                    setState(() {
-                      _selectedStatusFilter = newValue;
-                    });
-                  },
-                  itemBuilder: (BuildContext context) {
-                    return statusOptions.map((String choice) {
-                      return PopupMenuItem<String>(
-                        value: choice,
-                        child: Text(
-                          choice[0].toUpperCase() + choice.substring(1),
-                          style: TextStyle(
-                            color: Colors.blue[900],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      );
-                    }).toList();
-                  },
-                  color: Colors.blue[50],
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min, 
-                      children: [
-                        Icon(Icons.filter_list, color: Colors.blue[700]),
-                        if (_selectedStatusFilter != 'All') ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            _selectedStatusFilter[0].toUpperCase() + _selectedStatusFilter.substring(1),
-                            style: TextStyle(
-                              color: Colors.blue[900],
-                              fontWeight: FontWeight.w500,
+        // Only show search/filter and generate button if there are events
+        FutureBuilder<List<Event>>(
+          future: _allEventsFuture,
+          builder: (context, snapshot) {
+            final hasEvents = snapshot.hasData && snapshot.data!.isNotEmpty;
+
+            if (!hasEvents) {
+              return const SizedBox.shrink(); // Hide everything if no events
+            }
+
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            hintText: 'Search...',
+                            prefixIcon: Icon(Icons.search, color: Colors.blue[700]),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () => _searchController.clear(),
+                            )
+                                : null,
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
                             ),
                           ),
-                        ]
-                      ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: PopupMenuButton<String>(
+                          onSelected: (String newValue) {
+                            setState(() {
+                              _selectedStatusFilter = newValue;
+                            });
+                          },
+                          itemBuilder: (BuildContext context) {
+                            return statusOptions.map((String choice) {
+                              return PopupMenuItem<String>(
+                                value: choice,
+                                child: Text(
+                                  choice[0].toUpperCase() + choice.substring(1),
+                                  style: TextStyle(
+                                    color: Colors.blue[900],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              );
+                            }).toList();
+                          },
+                          color: Colors.blue[50],
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.filter_list, color: Colors.blue[700]),
+                                if (_selectedStatusFilter != 'All') ...[
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _selectedStatusFilter[0].toUpperCase() + _selectedStatusFilter.substring(1),
+                                    style: TextStyle(
+                                      color: Colors.blue[900],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ]
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Generate Report Button
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: ElevatedButton.icon(
+                    onPressed: _generateAndDownloadReport,
+                    icon: Icon(Icons.assessment, color: Colors.white),
+                    label: Text('Generate Performance Report', style: TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue[700],
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            );
+          },
         ),
         Expanded(
           child: FutureBuilder<List<Event>>(
-            future: _allEventsFuture, // Use the single future here
+            future: _allEventsFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator(color: Colors.white));
@@ -622,12 +853,20 @@ class _AgendaScreenState extends State<AgendaScreen> {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Create your first event to get started!',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.blue[700],
+                        ),
+                      ),
                     ],
                   ),
                 );
               } else {
                 final allEvents = snapshot.data!;
-                
+
                 List<Event> statusFilteredEvents;
                 if (_selectedStatusFilter == 'All') {
                   statusFilteredEvents = allEvents;
@@ -636,7 +875,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                 }
 
                 final filteredEvents = _eventService.filterEvents(statusFilteredEvents, _searchController.text);
-                
+
                 filteredEvents.sort((a, b) {
                   final aDeadline = DateFormat('yyyy-MM-dd HH:mm').parse('${a.deadlineDate} ${a.deadlineTime}');
                   final bDeadline = DateFormat('yyyy-MM-dd HH:mm').parse('${b.deadlineDate} ${b.deadlineTime}');
@@ -645,7 +884,29 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
                 if (filteredEvents.isEmpty) {
                   return Center(
-                    child: Text('No results found', style: TextStyle(color: Colors.blue[900], fontSize: 18)),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.search_off, size: 80, color: Colors.blue[300]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No results found',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.blue[900],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Try adjusting your search or filters',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.blue[700],
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 }
 
