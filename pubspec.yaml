@@ -1,0 +1,68 @@
+name: internify
+description: A beautiful user registration and login app with SQLite.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # SQLite database
+  sqflite: ^2.3.0
+  path: ^1.8.3
+
+  # PDF handling
+  pdf: ^3.11.3
+  printing: ^5.14.2
+  syncfusion_flutter_pdf: ^24.2.9  # For reading/editing PDFs with watermarks
+  pdfx: ^2.9.2
+
+  # File handling
+  path_provider: ^2.1.5
+  file_picker: ^8.0.0+1
+  open_file: ^3.2.1
+  image_picker: ^0.8.7+5
+
+  # Charts and signature
+  fl_chart: ^0.66.0  # For pie charts
+  signature: ^5.4.0
+
+  # UI Components
+  cupertino_icons: ^1.0.2
+  date_picker_timeline: ^1.2.6
+  analog_clock: ^0.1.1
+
+  # State management & storage
+  shared_preferences: ^2.2.1
+
+  # Network & API
+  http: ^1.5.0
+  mailer: ^6.0.1
+  url_launcher: ^6.1.7
+
+  # Security & Crypto
+  crypto: ^3.0.2
+  bcrypt: ^1.1.3
+
+  # Permissions & Sharing
+  permission_handler: ^11.0.0
+  share_plus: ^12.0.0
+
+  # Notifications & Firebase
+  flutter_local_notifications: ^19.5.0
+  firebase_core: ^2.10.0
+  firebase_messaging: ^14.6.0
+
+  # ML & Text Recognition
+  google_mlkit_text_recognition: ^0.13.0  # Updated to latest compatible version
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
